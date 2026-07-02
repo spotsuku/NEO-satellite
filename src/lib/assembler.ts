@@ -1,0 +1,324 @@
+// =============================================================================
+// 正規化済みの生データ（マスタ＋トランザクション）から DashboardData を組み立てる。
+// モックモード（mockData.ts）と Supabase モード（data.ts）の共通経路。
+// =============================================================================
+
+import type {
+  DashboardData,
+  Trigger,
+  StatusDef,
+  BaseView,
+  Stakeholder,
+  ActivityItem,
+  PrepRole,
+  TriggerLogEntry,
+  StatusName,
+  PrepState,
+} from "./types";
+import {
+  computeClock,
+  moneyFromStakeholders,
+  isStale,
+  mmdd,
+  TRIGGER_SHORT,
+  DEFAULT_FUEL_TARGETS,
+} from "./domain";
+import { PREFECTURE_PATHS } from "./prefectures";
+
+export interface RawBase {
+  id: string;
+  code: string;
+  name: string;
+  name_en: string;
+  region: string | null;
+  goal_amount: number;
+  deadline_days: number;
+  accent_color: string | null;
+  silhouette_path: string | null;
+  sort: number;
+}
+export interface RawTrigger {
+  code: string;
+  name: string;
+  description: string | null;
+  is_clock_start: boolean;
+  auto_rule: "prep_complete" | "goal_reached" | null;
+  sort: number;
+}
+export interface RawStatus {
+  name: StatusName;
+  confidence: number;
+  is_active_deal: boolean;
+  is_terminal: boolean;
+  color: string;
+}
+export interface RawCategory {
+  name: string;
+  uses_amount: boolean;
+}
+export interface RawStakeholder {
+  id: string;
+  base_code: string;
+  category: string;
+  status: StatusName;
+  name: string;
+  contact_name: string;
+  commit_amount: number | null;
+  approached_on: string | null;
+  last_touched_on: string | null;
+  next_action: string;
+  next_action_due: string | null;
+  is_sample: boolean;
+}
+export interface RawTriggerEvent {
+  base_code: string;
+  trigger_code: string;
+  achieved_on: string;
+  participants: string | null;
+  evidence: string;
+  recorded_by: string;
+}
+export interface RawPrep {
+  base_code: string;
+  role_name: string;
+  sort: number;
+  state: PrepState;
+  stakeholder_name: string | null;
+}
+export interface RawFuel {
+  base_code: string;
+  metric: "interest" | "loi" | "students" | "partner_univ";
+  value: number;
+}
+export interface RawActivity {
+  id: string;
+  base_name: string | null;
+  kind: string;
+  title: string;
+  body: string | null;
+  is_big: boolean;
+  actor_name: string | null;
+  created_at: string; // ISO datetime or date
+}
+// NEXT TRIGGER カードの編集メモ（任意・モックのみ）
+export interface RawEditorial {
+  base_code: string;
+  note: string;
+  ready: string;
+}
+
+export interface RawBundle {
+  bases: RawBase[];
+  triggers: RawTrigger[];
+  statuses: RawStatus[];
+  categories: RawCategory[];
+  relTypes: { name: string; color: string }[];
+  stakeholders: RawStakeholder[];
+  triggerEvents: RawTriggerEvent[];
+  prep: RawPrep[];
+  fuels: RawFuel[];
+  activities: RawActivity[];
+  editorial?: RawEditorial[];
+}
+
+export function buildDashboard(
+  raw: RawBundle,
+  todayIso: string,
+  usingSupabase: boolean,
+): DashboardData {
+  const triggers: Trigger[] = [...raw.triggers]
+    .sort((a, b) => a.sort - b.sort)
+    .map((t) => ({
+      code: t.code,
+      name: t.name,
+      short: TRIGGER_SHORT[t.code] ?? t.name,
+      description: t.description ?? "",
+      isClockStart: t.is_clock_start,
+      autoRule: t.auto_rule,
+      sort: t.sort,
+    }));
+
+  const statuses: StatusDef[] = raw.statuses.map((s) => ({
+    name: s.name,
+    confidence: Number(s.confidence),
+    isActiveDeal: s.is_active_deal,
+    isTerminal: s.is_terminal,
+    color: s.color,
+  }));
+
+  const catByName = new Map(raw.categories.map((c) => [c.name, c]));
+  const clockTriggerCode = triggers.find((t) => t.isClockStart)?.code ?? "T1";
+  const triggersTotal = triggers.length;
+
+  // ---- ステークホルダー（全社横断テーブル用）----
+  const baseName = new Map(raw.bases.map((b) => [b.code, b.name]));
+  const stakeholders: Stakeholder[] = raw.stakeholders.map((s) => {
+    const cat = catByName.get(s.category);
+    return {
+      id: s.id,
+      baseName: baseName.get(s.base_code) ?? s.base_code,
+      baseCode: s.base_code,
+      category: s.category,
+      usesAmount: cat?.uses_amount ?? false,
+      name: s.name,
+      contactName: s.contact_name,
+      status: s.status,
+      commitAmount: s.commit_amount,
+      approachedOn: s.approached_on,
+      lastTouchedOn: s.last_touched_on,
+      nextAction: s.next_action,
+      nextActionDue: s.next_action_due,
+      isSample: s.is_sample,
+      isStale: isStale(
+        {
+          status: s.status,
+          nextAction: s.next_action,
+          approachedOn: s.approached_on,
+          lastTouchedOn: s.last_touched_on,
+        },
+        statuses,
+        todayIso,
+      ),
+    };
+  });
+
+  const editorialByBase = new Map((raw.editorial ?? []).map((e) => [e.base_code, e]));
+
+  // ---- 拠点ビュー ----
+  const bases: BaseView[] = [...raw.bases]
+    .sort((a, b) => a.sort - b.sort)
+    .map((b) => {
+      const events = raw.triggerEvents
+        .filter((e) => e.base_code === b.code)
+        .sort((x, y) => (x.achieved_on < y.achieved_on ? 1 : -1));
+      const achievedCodes = events.map((e) => e.trigger_code);
+      const done = achievedCodes.length;
+
+      const clockStartIso =
+        events.find((e) => e.trigger_code === clockTriggerCode)?.achieved_on ?? null;
+      const clock = computeClock(clockStartIso, b.deadline_days, todayIso);
+
+      // 燃料（最新値）
+      const fuelFor = (m: RawFuel["metric"]) =>
+        raw.fuels.find((f) => f.base_code === b.code && f.metric === m)?.value ?? 0;
+      const fuels = {
+        interest: fuelFor("interest"),
+        loi: fuelFor("loi"),
+        students: fuelFor("students"),
+        partner_univ: fuelFor("partner_univ"),
+      };
+
+      // 加盟金
+      const money = moneyFromStakeholders(
+        stakeholders
+          .filter((s) => s.baseCode === b.code)
+          .map((s) => ({ commitAmount: s.commitAmount, status: s.status, usesAmount: s.usesAmount })),
+        statuses,
+      );
+
+      // 準備室ロール
+      const prepRows = raw.prep
+        .filter((p) => p.base_code === b.code)
+        .sort((x, y) => x.sort - y.sort);
+      const prep: PrepRole[] = prepRows.map((p) => ({
+        roleName: p.role_name,
+        state: p.state,
+        stakeholderName: p.stakeholder_name,
+      }));
+      const prepTotal = prepRows.length || 5;
+      const prepSecured = prep.filter((p) => p.state === "確保").length;
+
+      // NEXT
+      const nextT = triggers[Math.min(done, triggersTotal - 1)];
+      const ed = editorialByBase.get(b.code);
+      const next = {
+        code: nextT.code,
+        name: nextT.name,
+        note: ed?.note,
+        ready: ed?.ready,
+      };
+
+      // トリガーログ
+      const history: TriggerLogEntry[] = events.map((e) => {
+        const t = triggers.find((x) => x.code === e.trigger_code);
+        return {
+          date: mmdd(e.achieved_on),
+          isoDate: e.achieved_on,
+          title: `${e.trigger_code} ${t?.name ?? ""} 成立`,
+          evidence: e.evidence,
+          isTrigger: true,
+        };
+      });
+
+      const staleCount = stakeholders.filter((s) => s.baseCode === b.code && s.isStale).length;
+
+      const proposeT3 = prepSecured === prepTotal && !achievedCodes.includes("T3");
+      const proposeT7 = money.fixed >= b.goal_amount && !achievedCodes.includes("T7");
+
+      return {
+        id: b.id,
+        code: b.code,
+        name: b.name,
+        nameEn: b.name_en,
+        goalAmount: b.goal_amount,
+        deadlineDays: b.deadline_days,
+        accentColor: b.accent_color,
+        silhouettePath: b.silhouette_path ?? PREFECTURE_PATHS[b.code] ?? null,
+        done,
+        triggersTotal,
+        achievedCodes,
+        clockStartIso,
+        daysLeft: clock.daysLeft,
+        deadlineLabel: clock.deadlineLabel,
+        clockPct: clock.clockPct,
+        fuels,
+        fuelTargets: DEFAULT_FUEL_TARGETS,
+        money,
+        prep,
+        prepSecured,
+        prepTotal,
+        next,
+        history,
+        staleCount,
+        proposeT3,
+        proposeT7,
+      } satisfies BaseView;
+    });
+
+  // ---- 全社KPI ----
+  const company = {
+    fixed: bases.reduce((s, b) => s + b.money.fixed, 0),
+    withSoft: bases.reduce((s, b) => s + b.money.withSoft, 0),
+    eventsDone: bases.reduce((s, b) => s + b.done, 0),
+    eventsTotal: bases.length * triggersTotal,
+    goalTotal: bases.reduce((s, b) => s + b.goalAmount, 0),
+  };
+
+  // ---- アクティビティ ----
+  const activities: ActivityItem[] = [...raw.activities]
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .map((a) => ({
+      id: a.id,
+      date: mmdd(a.created_at.slice(0, 10)),
+      isoDate: a.created_at.slice(0, 10),
+      baseName: a.base_name,
+      kind: a.kind,
+      title: a.title,
+      body: a.body,
+      isBig: a.is_big,
+      actorName: a.actor_name,
+    }));
+
+  return {
+    usingSupabase,
+    today: todayIso,
+    triggers,
+    statuses,
+    categories: raw.categories.map((c) => ({ name: c.name, usesAmount: c.uses_amount })),
+    relTypes: raw.relTypes,
+    bases,
+    company,
+    stakeholders,
+    activities,
+  };
+}

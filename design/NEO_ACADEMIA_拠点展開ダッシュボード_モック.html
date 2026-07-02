@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEO ACADEMIA — 拠点展開ダッシュボード</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A0A0A; --paper:#FFFFFF;
+  --gray:#707070; --lgray:#B0B0B0; --line:#E5E5E5; --hover:#F7F7F4;
+  --yellow:#F0F000; --pink:#F03090; --cyan:#00C0F0; --green:#50F000; --red:#F01010;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'Noto Sans JP',sans-serif;font-size:14px;line-height:1.7;min-height:100vh}
+.en{font-family:'Montserrat','Noto Sans JP',sans-serif;letter-spacing:.35em;text-transform:uppercase}
+
+/* ===== diagonal bar motif on a thin black band ===== */
+.diag-wrap{position:relative;height:14px;overflow:hidden;background:var(--ink)}
+.diag{position:absolute;left:-5%;width:110%;height:3px;transform:rotate(-2deg)}
+.diag.y{background:var(--yellow);top:1px}
+.diag.p{background:var(--pink);top:6px}
+.diag.c{background:var(--cyan);top:11px}
+
+/* ===== header (black block) ===== */
+header{display:flex;align-items:center;gap:24px;padding:20px 40px 18px;background:var(--ink);color:#fff}
+header img.logo{height:34px;display:block}
+header .ttl{font-size:15px;font-weight:700;letter-spacing:.12em;white-space:nowrap}
+header .sub{font-size:11px;color:var(--lgray);letter-spacing:.28em;font-family:'Montserrat',sans-serif}
+header .right{margin-left:auto;text-align:right;font-size:11px;color:var(--lgray)}
+
+/* ===== KPI: company summary + per-base progress ===== */
+.kpis{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:14px;padding:16px 40px;background:var(--paper);border-bottom:1px solid var(--line)}
+.kpi{background:var(--ink);color:#fff;padding:14px 18px 14px;position:relative}
+.kpi::before{content:"";position:absolute;top:0;left:0;width:100%;height:3px;background:var(--bar,var(--yellow))}
+.kpi .lb{font-size:10px;color:var(--lgray);letter-spacing:.26em;font-family:'Montserrat',sans-serif;text-transform:uppercase}
+.kpi .num{font-size:30px;font-weight:800;font-family:'Montserrat','Noto Sans JP',sans-serif;letter-spacing:.02em;line-height:1.3}
+.kpi .num .u{font-size:13px;font-weight:700;color:var(--lgray);margin-left:3px}
+.ac-y{color:var(--yellow)} .ac-p{color:var(--pink)} .ac-c{color:var(--cyan)} .ac-g{color:var(--green)}
+.kpi .note{font-size:11px;color:var(--lgray)}
+.kpi .bar{height:4px;background:#333;margin:8px 0 6px;position:relative}
+.kpi .bar i{position:absolute;top:0;left:0;height:100%;display:block}
+.kpib{cursor:pointer;transition:transform .12s}
+.kpib:hover{transform:translateY(-2px)}
+.kpib .bn{font-size:13px;font-weight:700;letter-spacing:.08em}
+.kpib .bn small{font-size:8px;color:var(--lgray);letter-spacing:.24em;font-family:'Montserrat',sans-serif;margin-left:6px}
+.kpib .pnum{font-size:34px;font-weight:800;font-family:'Montserrat','Noto Sans JP',sans-serif;line-height:1.2}
+.kpib .pnum .u{font-size:13px;color:var(--lgray);font-weight:700}
+.kpib .sub{font-size:10px;color:var(--lgray);line-height:1.6}
+.kpib .sub b{color:#fff}
+@media(max-width:1100px){.kpis{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.kpis{grid-template-columns:1fr}}
+
+/* ===== tabs ===== */
+nav.tabs{display:flex;gap:0;padding:0 40px;border-bottom:1px solid var(--line);background:var(--paper)}
+nav.tabs button{background:none;border:none;color:var(--gray);font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:500;padding:14px 22px;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.08em}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:700}
+nav.tabs button:hover{color:var(--ink)}
+
+main{padding:28px 40px 80px;max-width:1280px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+
+/* ===== event chain board ===== */
+.legend{display:flex;gap:22px;align-items:center;font-size:11px;color:var(--gray);margin-bottom:20px;flex-wrap:wrap}
+.legend .dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;margin-right:6px}
+.legend .dot.done{border:3px solid var(--green)}
+.legend .dot.now{border:3px solid var(--ink)}
+.legend .dot.fut{border:2px solid var(--lgray)}
+
+.chain-head{display:grid;grid-template-columns:150px repeat(7,1fr) 130px;gap:0;padding:0 0 8px;border-bottom:2px solid var(--ink);margin-bottom:4px}
+.chain-head .tcol{text-align:center;font-size:10px;color:var(--gray)}
+.chain-head .tcol b{display:block;font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.2em;color:var(--ink)}
+.chain-head .mcol{font-size:10px;color:var(--gray);text-align:center}
+
+.krow{display:grid;grid-template-columns:150px repeat(7,1fr) 130px;align-items:center;padding:20px 0 6px;border-bottom:none;cursor:pointer;transition:background .15s}
+.krow:hover{background:var(--hover)}
+.krow .kname{font-size:17px;font-weight:700;letter-spacing:.06em}
+.krow .kname small{display:block;font-size:10px;color:var(--gray);font-weight:400;letter-spacing:.24em;font-family:'Montserrat',sans-serif}
+.krow .kname .ph{display:inline-block;margin-top:5px;font-size:10px;color:#fff;background:var(--ink);padding:2px 9px;letter-spacing:.1em;font-weight:500}
+
+.node{position:relative;height:44px;display:flex;align-items:center;justify-content:center}
+.node .lnk{position:absolute;top:50%;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+.node .lnk.done{background:var(--green)}
+.node .c{position:relative;z-index:1;width:16px;height:16px;border-radius:50%;background:var(--paper);border:2px solid var(--lgray)}
+.node .c.done{border-color:var(--green)}
+.node .c.done::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--green)}
+.node .c.now{border:3px solid var(--ink);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.45}}
+@media (prefers-reduced-motion: reduce){.node .c.now{animation:none}}
+
+.money-mini{padding:0 8px}
+.money-mini .amt{font-family:'Montserrat','Noto Sans JP',sans-serif;font-size:15px;font-weight:800;text-align:right}
+.money-mini .amt .u{font-size:10px;color:var(--gray);font-weight:500}
+.money-mini .track{height:5px;background:#EDEDEA;margin-top:5px;position:relative}
+.money-mini .track i{position:absolute;top:0;height:100%}
+.money-mini .cap{font-size:9px;color:var(--gray);text-align:right;margin-top:3px}
+
+.fuelrow{display:grid;grid-template-columns:150px 1fr 130px;padding:0 0 18px;border-bottom:1px solid var(--line)}
+.fuels{display:flex;gap:26px;padding-top:10px;flex-wrap:wrap}
+.fuel{min-width:120px}
+.fuel .fl{font-size:10px;color:var(--gray)}
+.fuel .fv{font-size:13px;font-weight:700;font-family:'Montserrat','Noto Sans JP',sans-serif}
+.fuel .ft{height:3px;background:#EDEDEA;margin-top:4px;position:relative;width:110px}
+.fuel .ft i{position:absolute;top:0;left:0;height:100%}
+
+/* ===== detail panel ===== */
+.detail{border:1px solid var(--ink);margin-top:26px;display:none;background:var(--paper)}
+.detail.on{display:block}
+.detail .dhead{display:flex;align-items:baseline;gap:18px;padding:22px 28px 0}
+.detail .dhead h2{font-size:24px;font-weight:700;letter-spacing:.06em}
+.detail .dhead .st{font-size:11px;color:var(--yellow);background:var(--ink);padding:3px 12px;letter-spacing:.12em;font-weight:700}
+.detail .dhead .x{margin-left:auto;background:none;border:1px solid var(--line);color:var(--gray);width:30px;height:30px;cursor:pointer;font-size:14px}
+.detail .dhead .x:hover{border-color:var(--ink);color:var(--ink)}
+.dgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:0 40px;padding:20px 28px 26px}
+.dcol h3{font-size:11px;color:var(--gray);letter-spacing:.3em;font-family:'Montserrat',sans-serif;text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:14px}
+.layer{margin-bottom:20px}
+.layer .ln{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.layer .ln b{font-size:15px}
+.layer .ln .v{font-family:'Montserrat','Noto Sans JP',sans-serif;font-weight:800;font-size:20px;color:var(--ink)!important}
+.layer .track{height:7px;background:#EDEDEA;margin-top:7px;position:relative}
+.layer .track i{position:absolute;top:0;height:100%}
+.layer .cap{display:flex;gap:16px;font-size:10px;color:var(--gray);margin-top:5px;flex-wrap:wrap}
+.layer .cap .sw{display:inline-block;width:14px;height:3px;vertical-align:3px;margin-right:5px}
+.nextact{background:var(--ink);color:#fff;padding:14px 18px;margin-top:6px}
+.nextact .nl{font-size:10px;color:var(--yellow);letter-spacing:.3em;font-family:'Montserrat',sans-serif}
+.nextact .nv{font-size:15px;font-weight:700;margin-top:2px}
+.nextact .nd{font-size:11px;color:var(--lgray)}
+.tl{list-style:none;margin-top:4px}
+.tl li{position:relative;padding:0 0 16px 22px;border-left:2px solid var(--line);margin-left:6px}
+.tl li:last-child{padding-bottom:2px}
+.tl li::before{content:"";position:absolute;left:-8px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--paper);border:3px solid var(--green)}
+.tl li.pending::before{border-color:var(--lgray)}
+.tl li .td{font-size:10px;color:var(--gray);font-family:'Montserrat',sans-serif;letter-spacing:.1em}
+.tl li .tt{font-size:13px;font-weight:700}
+.tl li .tx{font-size:11px;color:var(--gray)}
+.demo-btn{display:inline-block;margin-top:14px;background:var(--paper);border:2px solid var(--pink);color:var(--pink);font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;padding:9px 20px;cursor:pointer;letter-spacing:.1em}
+.demo-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* ===== stakeholder table ===== */
+.filters{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.filters button{background:none;border:1px solid var(--line);color:var(--gray);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+.filters button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;color:var(--gray);letter-spacing:.18em;text-align:left;padding:10px 12px;border-bottom:2px solid var(--ink);font-weight:500}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.row:hover{background:var(--hover)}
+.stat{white-space:nowrap;font-weight:700;color:var(--ink)}
+.stat::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:0;border:2px solid var(--dc);box-shadow:inset 0 0 0 1px rgba(10,10,10,.12)}
+.stat.filled::before{background:var(--dc)}
+.amtcell{font-family:'Montserrat','Noto Sans JP',sans-serif;font-weight:700;text-align:right}
+.alert{color:var(--red);font-weight:700;font-size:11px}
+.dim{color:var(--gray)}
+.samp{color:var(--gray);font-size:10px;margin-left:6px;border:1px solid var(--line);padding:0 5px}
+
+
+/* ===== whiteboard map ===== */
+.maptools{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:8px}
+.mtype{font-size:11px;color:var(--gray)}
+.mtype button{background:none;border:1px solid var(--line);color:var(--gray);font-family:'Noto Sans JP',sans-serif;font-size:11px;padding:4px 10px;cursor:pointer;margin-left:6px}
+.mtype button.on{border-color:var(--ink);color:var(--ink);font-weight:700}
+.mtype button i{display:inline-block;width:12px;height:3px;margin-right:5px;vertical-align:3px}
+.mreset{margin-left:auto;background:none;border:1px solid var(--line);color:var(--gray);font-family:'Noto Sans JP',sans-serif;font-size:11px;padding:5px 12px;cursor:pointer}
+.mreset:hover{border-color:var(--ink);color:var(--ink)}
+.maphint{font-size:11px;color:var(--gray);margin-bottom:12px}
+.canvas{position:relative;height:600px;border:1px solid var(--ink);overflow:hidden;touch-action:none;
+  background-image:radial-gradient(#DCDCD8 1px,transparent 1px);background-size:22px 22px}
+#edges{position:absolute;inset:0;width:100%;height:100%}
+#edges line{cursor:pointer}
+#edges text{font-size:10px;font-weight:700;font-family:'Noto Sans JP',sans-serif;fill:var(--gray);cursor:pointer}
+.mnode{position:absolute;background:var(--paper);border:1.5px solid var(--ink);padding:8px 26px 8px 12px;min-width:120px;max-width:190px;cursor:grab;user-select:none;line-height:1.5}
+.mnode:active{cursor:grabbing}
+.mnode b{display:block;font-size:12.5px}
+.mnode small{display:block;font-size:9.5px;color:var(--gray)}
+.mnode .msd{position:absolute;top:8px;right:24px;width:8px;height:8px;border-radius:50%}
+.mnode .mport{position:absolute;top:50%;right:-7px;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;background:var(--ink);border:2px solid var(--paper);cursor:crosshair}
+.mnode .mport:hover{background:var(--pink)}
+.mnode.mhub{background:var(--ink);color:#fff;border-color:var(--ink);cursor:grab;padding:12px 26px 12px 16px}
+.mnode.mhub b{font-size:14px}
+.mnode.mhub small{color:var(--lgray)}
+.mnode.linktarget{border-color:var(--pink);border-width:2.5px}
+
+/* ===== activity feed ===== */
+.feed{list-style:none;max-width:760px}
+.feed li{display:flex;gap:18px;padding:16px 4px;border-bottom:1px solid var(--line)}
+.feed .fd{font-size:10px;color:var(--gray);font-family:'Montserrat',sans-serif;letter-spacing:.1em;min-width:64px;padding-top:4px}
+.feed .fk{font-size:11px;font-weight:700;min-width:44px;padding-top:2px}
+.feed .fb{font-size:13px}
+.feed .fb small{display:block;color:var(--gray);font-size:11px}
+.feed li.big .fb{font-size:15px;font-weight:700}
+.feed .mk{background:var(--ink);color:#fff;padding:1px 8px}
+
+/* ===== celebration overlay (black slide moment) ===== */
+#cele{position:fixed;inset:0;background:var(--ink);color:#fff;display:none;z-index:99;overflow:hidden}
+#cele.on{display:block}
+#cele .cbar{position:absolute;left:-140%;width:130%;height:14px;transform:rotate(-22deg)}
+#cele .cbar.b1{background:var(--yellow);top:26%;animation:sweep 1s cubic-bezier(.2,.8,.2,1) forwards}
+#cele .cbar.b2{background:var(--pink);top:31%;height:8px;animation:sweep 1s .12s cubic-bezier(.2,.8,.2,1) forwards}
+#cele .cbar.b3{background:var(--cyan);top:35%;height:5px;animation:sweep 1s .24s cubic-bezier(.2,.8,.2,1) forwards}
+#cele .cbar.b4{background:var(--cyan);bottom:30%;height:5px;left:110%;animation:sweepL 1s .1s cubic-bezier(.2,.8,.2,1) forwards}
+#cele .cbar.b5{background:var(--pink);bottom:26%;height:8px;left:110%;animation:sweepL 1s .22s cubic-bezier(.2,.8,.2,1) forwards}
+#cele .cbar.b6{background:var(--yellow);bottom:21%;left:110%;animation:sweepL 1s .34s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes sweep{to{left:5%}}
+@keyframes sweepL{to{left:-35%}}
+#cele .cmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:0;animation:fadein .6s .5s forwards}
+@keyframes fadein{to{opacity:1}}
+#cele .ck{font-size:12px;color:var(--yellow);letter-spacing:.5em;font-family:'Montserrat',sans-serif}
+#cele .ct{font-size:52px;font-weight:800;letter-spacing:.08em;text-align:center}
+#cele .cs{font-size:14px;color:var(--lgray)}
+#cele .cx{margin-top:26px;background:none;border:1px solid #fff;color:#fff;font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:9px 26px;cursor:pointer;letter-spacing:.2em}
+#cele .cx:hover{background:#fff;color:var(--ink)}
+@media (prefers-reduced-motion: reduce){#cele .cbar{animation-duration:.01s!important}#cele .cmsg{animation-duration:.01s!important}}
+
+
+
+/* ===== 7-step index ===== */
+.steps{display:flex;align-items:stretch;gap:0;border:1px solid var(--ink);margin-bottom:20px;overflow:hidden}
+.step{flex:1;padding:9px 8px 8px;border-right:1px solid var(--line);position:relative}
+.step:last-child{border-right:none}
+.step .sid{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--gray)}
+.step .snm{font-size:11.5px;font-weight:700;line-height:1.4}
+.step .sdc{font-size:9.5px;color:var(--gray);line-height:1.45;margin-top:1px}
+.step::after{content:"→";position:absolute;right:-6px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--gray);background:var(--paper);z-index:1;padding:0 1px}
+.step:last-child::after{content:""}
+@media(max-width:1100px){.steps{flex-wrap:wrap}.step{min-width:25%}}
+
+/* ===== comparison cards ===== */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{border:1px solid var(--line);padding:18px 18px 16px;cursor:pointer;transition:border-color .15s;background:var(--paper);position:relative}
+.card:hover{border-color:var(--ink)}
+.card .ctop{display:flex;justify-content:space-between;align-items:baseline}
+.card .cn{font-size:19px;font-weight:700;letter-spacing:.06em}
+.card .cn small{display:block;font-size:9px;color:var(--gray);letter-spacing:.26em;font-family:'Montserrat',sans-serif;font-weight:500}
+.card .pct{font-family:'Montserrat','Noto Sans JP',sans-serif;font-size:24px;font-weight:800;line-height:1}
+.card .pct small{font-size:10px;color:var(--gray);font-weight:500;letter-spacing:.05em}
+.card .sil{display:block;width:100%;height:150px;margin:10px 0 6px}
+.card .chain{display:flex;align-items:center;margin:4px 0 12px}
+.card .chain .cd{width:12px;height:12px;border-radius:50%;border:2px solid var(--lgray);background:var(--paper);flex:none;position:relative;z-index:1}
+.card .chain .cd.done{border-color:var(--green);background:var(--green)}
+.card .chain .cd.now{border:3px solid var(--ink);animation:pulse 1.6s ease-in-out infinite}
+.card .chain .cl{flex:1;height:2px;background:var(--line)}
+.card .chain .cl.done{background:var(--green)}
+.card .mrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--gray)}
+.card .mrow b{font-family:'Montserrat','Noto Sans JP',sans-serif;font-size:16px;font-weight:800;color:var(--ink)}
+.mtrack{height:5px;background:#EDEDEA;margin:5px 0 12px;position:relative}
+.mtrack i{position:absolute;top:0;height:100%}
+.card .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-bottom:14px}
+.card .fg .fl{font-size:9px;color:var(--gray);letter-spacing:.04em}
+.card .fg .fv{font-size:13px;font-weight:700;font-family:'Montserrat','Noto Sans JP',sans-serif}
+.card .fg .ft{height:3px;background:#EDEDEA;margin-top:3px;position:relative}
+.card .fg .ft i{position:absolute;top:0;left:0;height:100%}
+
+.prep-row{display:flex;align-items:center;gap:8px;margin:-4px 0 10px}
+.prep-row .fl{font-size:9px;color:var(--gray)}
+.prep-row .fv{font-size:11px;font-weight:700;font-family:'Montserrat','Noto Sans JP',sans-serif;margin-left:auto}
+.pdots{display:flex;gap:4px}
+.pd{width:11px;height:11px;border-radius:50%;border:2px solid var(--lgray);background:var(--paper);display:inline-block}
+.ddl{font-size:10.5px;color:var(--gray);margin:0 0 12px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ddl b{font-family:'Montserrat','Noto Sans JP',sans-serif;font-size:13px;margin-left:auto}
+.ddl .dt{width:100%;height:3px;background:#EDEDEA;position:relative}
+.ddl .dt i{position:absolute;top:0;left:0;height:100%}
+.ddl.idle{color:var(--lgray)}
+.card .nx{display:block;background:var(--ink);color:#fff;font-size:11px;font-weight:500;padding:7px 12px;letter-spacing:.08em}
+.card .nx b{color:var(--yellow);font-weight:700;margin-right:6px;font-family:'Montserrat',sans-serif}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cards{grid-template-columns:1fr}}
+
+.footnote{margin-top:34px;font-size:11px;color:var(--gray);border-top:1px solid var(--line);padding-top:14px}
+@media(max-width:900px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .chain-head,.krow{grid-template-columns:110px repeat(7,1fr) 0px}
+  .money-mini{display:none}
+  .fuelrow{grid-template-columns:110px 1fr 0px}
+  .dgrid{grid-template-columns:1fr}
+  main,header,.kpis{padding-left:18px;padding-right:18px}
+  nav.tabs{padding:0 18px}
+}
+
+</style>
+</head>
+<body>
+
+<div class="diag-wrap"><div class="diag y"></div><div class="diag p"></div><div class="diag c"></div></div>
+
+<header>
+  <img class="logo" src="data:image/png;base64,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" alt="NEO ACADEMIA">
+  <div>
+    <div class="ttl">拠点展開ダッシュボード</div>
+    <div class="sub">Satellite Launch Board</div>
+  </div>
+  <div class="right">最終更新 2026.07.02（モックアップ／ダミーデータ含む）</div>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<nav class="tabs">
+  <button class="on" data-v="board">拠点ボード</button>
+  <button data-v="stake">ステークホルダー</button>
+  <button data-v="map">関係図マップ</button>
+  <button data-v="feed">アクティビティ</button>
+</nav>
+
+<main>
+
+<!-- ============ VIEW: BOARD ============ -->
+<section class="view on" id="v-board">
+  <div class="steps" id="steps"></div>
+  <div class="legend">
+    <span><span class="dot done"></span>成立済み</span>
+    <span><span class="dot now"></span>次のトリガー（準備中）</span>
+    <span><span class="dot fut"></span>未到達</span>
+    <span style="color:var(--gray)">県の黒塗り＝トリガー進捗（成立数/8）</span>
+    <span style="margin-left:auto">カードをクリックで詳細を表示</span>
+  </div>
+  <div class="cards" id="board"></div>
+  <div class="detail" id="detail"></div>
+  <div class="footnote">トリガーイベント T1〜T8。T1の成立から3ヶ月以内にT7（加盟金3000万円達成）をやり切るのが立ち上げの基本ルール。T3 準備室発足は「現地紹介者・オーナー企業候補・学生リーダー候補・大学・高校関係者・自治体関係者」の5ロールが各1名以上揃った時点で成立。イベントは「開催」ではなく成立条件（相手から次のアクションが提案される等）を満たした時点で成立と記録します。</div>
+</section>
+
+<!-- ============ VIEW: STAKEHOLDERS ============ -->
+<section class="view" id="v-stake">
+  <div class="filters" id="f-base"></div>
+  <div class="filters" id="f-cat"></div>
+  <table>
+    <thead><tr>
+      <th>拠点</th><th>カテゴリ</th><th>名前</th><th>担当者</th><th>ステータス</th><th style="text-align:right">金額(万)</th><th>アプローチ日</th><th>次回アクション</th>
+    </tr></thead>
+    <tbody id="stbody"></tbody>
+  </table>
+  <div class="footnote">「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。</div>
+</section>
+
+<!-- ============ VIEW: MAP ============ -->
+<section class="view" id="v-map">
+  <div class="maptools">
+    <div class="filters" id="f-mbase" style="margin-bottom:0"></div>
+    <div class="mtype">つなぐ線：<span id="mtypes"></span></div>
+    <button class="mreset" onclick="resetMap()">配置リセット</button>
+  </div>
+  <div class="maphint">カードをドラッグ＝移動 ／ カード右端の <span class="pd" style="border-color:var(--ink);background:var(--ink);width:9px;height:9px;vertical-align:-1px"></span> を別のカードへドラッグ＝線でつなぐ ／ 線をクリック＝削除（位置はこのセッション中のみ保持）</div>
+  <div class="canvas" id="canvas">
+    <svg id="edges"></svg>
+  </div>
+</section>
+
+<!-- ============ VIEW: FEED ============ -->
+<section class="view" id="v-feed">
+  <ul class="feed" id="feedlist"></ul>
+  <div class="footnote">イベント成立・ステータス前進を時系列で記録。n8n経由でSlack通知と連動する想定です。</div>
+</section>
+
+</main>
+
+<!-- ============ CELEBRATION ============ -->
+<div id="cele">
+  <div class="cbar b1"></div><div class="cbar b2"></div><div class="cbar b3"></div>
+  <div class="cbar b4"></div><div class="cbar b5"></div><div class="cbar b6"></div>
+  <div class="cmsg">
+    <div class="ck" id="ce-k">TRIGGER</div>
+    <div class="ct" id="ce-t">T3 準備室発足会 成立</div>
+    <div class="cs" id="ce-s"></div>
+    <button class="cx" onclick="document.getElementById('cele').classList.remove('on')">ボードに戻る</button>
+  </div>
+</div>
+
+<script>
+/* ================= DATA (mock) ================= */
+const TRIGGERS = [
+  {id:"T1", name:"紹介役合意",   full:"地域の紹介役合意",       dc:"顔役が事務局目線で紹介協力を合意"},
+  {id:"T2", name:"戦略会議",     full:"現地立上げ戦略会議",     dc:"関係者が自分ごと化する飲み会"},
+  {id:"T3", name:"準備室発足",   full:"準備室発足",             dc:"5ロール各1名以上で完成"},
+  {id:"T4", name:"説明会",       full:"現地説明会",             dc:"地域に構想をお披露目"},
+  {id:"T5", name:"トップ会談",   full:"オーナー候補トップ会談", dc:"経営者が出資検討者になる"},
+  {id:"T6", name:"調印式",       full:"1社目調印式",            dc:"構想が実在に変わる"},
+  {id:"T7", name:"3000万達成",   full:"加盟金3000万円達成",     dc:"立上げ条件クリア（T1から3ヶ月）"},
+  {id:"T8", name:"キックオフ",   full:"キックオフ（開校）",     dc:"本番の舞台が始まる"}
+];
+const N_STEPS = TRIGGERS.length;
+const DEADLINE_DAYS = 90;
+const TODAY = new Date("2026-07-02");
+const PREP_ROLES = [
+  {k:"intro",   l:"現地紹介者"},
+  {k:"owner",   l:"オーナー企業候補"},
+  {k:"student", l:"学生リーダー候補"},
+  {k:"edu",     l:"大学・高校関係者"},
+  {k:"gov",     l:"自治体関係者"}
+];
+const GOAL = 3000; // 万円 / 拠点
+
+const BASES = [
+  {
+    id:"oita", name:"大分", en:"OITA", done:2, start:"2026-06-02",
+    fuels:{interest:8, loi:3, students:12, univ:1},
+    money:{fixed:0, soft:0, pipe:1000},
+    prep:{intro:{s:2,n:"◯◯氏（地場金融OB）"}, owner:{s:2,n:"ジェイリース"}, student:{s:1,n:"K氏（APU3年・検討中）"}, edu:{s:2,n:"APU 地域連携室"}, gov:{s:0,n:"未接触"}},
+    next:{title:"T3 準備室発足", note:"自治体関係者の確保が最後のピース。市 商工労政課へ紹介ルートでアプローチ", ready:"準備室ロール 3/5 確保・1名検討中"},
+    history:[
+      {d:"06.20", t:"T2 現地立上げ戦略会議 成立", x:"参加9名。会の途中で◯◯氏から「次は△△社の社長を呼ぼう」の発言。宿題持ち帰り3名。"},
+      {d:"06.02", t:"T1 地域の紹介役合意 成立", x:"地場金融OBの◯◯氏が事務局目線での紹介協力を合意。ジェイリース・APUへの橋渡しを快諾。⏱ 3ヶ月時計スタート。"},
+      {d:"05.28", t:"APU 初回コンタクト", x:"地域連携室と面談設定。学生供給・共同PJの可能性を打診。"}
+    ]
+  },
+  {
+    id:"kumamoto", name:"熊本", en:"KUMAMOTO", done:1, start:"2026-06-25",
+    fuels:{interest:4, loi:1, students:0, univ:0},
+    money:{fixed:0, soft:0, pipe:0},
+    prep:{intro:{s:2,n:"キーマン◯◯氏"}, owner:{s:1,n:"地場IT B社（アポ調整中）"}, student:{s:0,n:"未接触"}, edu:{s:0,n:"未接触"}, gov:{s:0,n:"未接触"}},
+    next:{title:"T2 現地立上げ戦略会議", note:"興味人材あと2名で開催ライン。◯◯氏の紹介2件を今週アポ", ready:"燃料：興味人材 4/6名"},
+    history:[
+      {d:"06.25", t:"T1 地域の紹介役合意 成立", x:"半導体関連の進出で地元企業の人材危機感が強い。紹介協力の合意取得。⏱ 3ヶ月時計スタート。"}
+    ]
+  },
+  {
+    id:"nagasaki", name:"長崎", en:"NAGASAKI", done:0, start:null,
+    fuels:{interest:2, loi:0, students:0, univ:0},
+    money:{fixed:0, soft:0, pipe:0},
+    prep:{intro:{s:0,n:"候補2名と接触中"}, owner:{s:0,n:"—"}, student:{s:0,n:"—"}, edu:{s:0,n:"—"}, gov:{s:0,n:"—"}},
+    next:{title:"T1 地域の紹介役合意", note:"商工会議所ルートと大学ルートの2本で紹介役候補を探索中", ready:"候補2名と接触済み・合意未取得"},
+    history:[
+      {d:"06.28", t:"デスクリサーチ完了", x:"ターゲットリスト初期充足（オーナー候補10・教育8・自治体8）。"}
+    ]
+  },
+  {
+    id:"saga", name:"佐賀", en:"SAGA", done:0, start:null,
+    fuels:{interest:0, loi:0, students:0, univ:0},
+    money:{fixed:0, soft:0, pipe:0},
+    prep:{intro:{s:0,n:"—"}, owner:{s:0,n:"—"}, student:{s:0,n:"—"}, edu:{s:0,n:"—"}, gov:{s:0,n:"—"}},
+    next:{title:"T1 地域の紹介役合意", note:"リスト作成中。紹介起点の候補洗い出しから", ready:"デスクリサーチ進行中"},
+    history:[]
+  }
+];
+
+const STATUS = {
+  "未アプローチ":{c:"var(--gray)", fill:false},
+  "アポ調整中":{c:"var(--cyan)",  fill:false},
+  "商談中":    {c:"var(--cyan)",  fill:true},
+  "検討中":    {c:"var(--yellow)",fill:true},
+  "内諾":      {c:"var(--pink)",  fill:true},
+  "確定":      {c:"var(--green)", fill:true},
+  "見送り":    {c:"var(--red)",   fill:true}
+};
+
+const STAKE = [
+  {b:"大分", cat:"オーナー候補", name:"ジェイリース", p:"—", st:"商談中", amt:1000, ap:"2026-06-24", next:"役員向け収支シミュレーション提示（7/10）", samp:false},
+  {b:"大分", cat:"教育機関",     name:"APU（立命館アジア太平洋大学）", p:"地域連携室", st:"商談中", amt:null, ap:"2026-06-18", next:"連携形式の選択肢を提示", samp:false},
+  {b:"大分", cat:"オーナー候補", name:"県内メーカーA社", p:"経営企画", st:"アポ調整中", amt:null, ap:"2026-06-26", next:"初回訪問の日程調整", samp:true},
+  {b:"大分", cat:"自治体・メディア", name:"大分市 商工労政課", p:"—", st:"未アプローチ", amt:null, ap:null, next:"", samp:true},
+  {b:"大分", cat:"学生事務局",   name:"学生リーダー候補 K氏", p:"APU 3年", st:"検討中", amt:null, ap:"2026-06-21", next:"戦略会議の議事メモ共有・役割相談", samp:true},
+  {b:"熊本", cat:"オーナー候補", name:"地場IT B社", p:"代表", st:"アポ調整中", amt:null, ap:"2026-06-27", next:"キーマン同席での顔合わせ", samp:true},
+  {b:"熊本", cat:"教育機関",     name:"熊本大学", p:"—", st:"未アプローチ", amt:null, ap:null, next:"", samp:true},
+  {b:"熊本", cat:"事務局",       name:"事務局長候補 M氏", p:"元商社・Uターン", st:"検討中", amt:null, ap:"2026-06-10", next:"", samp:true},
+  {b:"長崎", cat:"オーナー候補", name:"造船関連 C社", p:"—", st:"未アプローチ", amt:null, ap:null, next:"", samp:true},
+  {b:"長崎", cat:"自治体・メディア", name:"長崎新聞社", p:"—", st:"未アプローチ", amt:null, ap:null, next:"", samp:true},
+  {b:"佐賀", cat:"オーナー候補", name:"（リスト作成中）", p:"—", st:"未アプローチ", amt:null, ap:null, next:"", samp:true}
+];
+
+const FEED = [
+  {d:"06.28", b:"長崎", big:false, t:"デスクリサーチ完了", x:"ターゲットリスト初期充足。T1探索フェーズへ。"},
+  {d:"06.26", b:"大分", big:false, t:"ジェイリース：商談中に前進", x:"コミット希望額1,000万円で協議開始。"},
+  {d:"06.25", b:"熊本", big:true,  t:"T1 地域の紹介役合意 成立", x:"紹介協力の合意獲得。3ヶ月時計スタート、戦略会議に向け興味人材の収集開始。"},
+  {d:"06.21", b:"大分", big:false, t:"学生リーダー候補と面談", x:"APU 3年 K氏。学生事務局の構想に強い関心。"},
+  {d:"06.20", b:"大分", big:true,  t:"T2 現地立上げ戦略会議 成立", x:"参加9名・宿題持ち帰り3名。「俺たちのプロジェクト」の空気に。"},
+  {d:"06.18", b:"大分", big:false, t:"APU 地域連携室と面談", x:"学生供給・共同プロジェクトの座組みを協議。"},
+  {d:"06.02", b:"大分", big:true,  t:"T1 地域の紹介役合意 成立", x:"地場金融OB ◯◯氏が紹介役に合意。⏱ 3ヶ月時計スタート。"}
+];
+
+/* ================= RENDER ================= */
+const fmt = n => n.toLocaleString("ja-JP");
+
+// steps index
+document.getElementById("steps").innerHTML = TRIGGERS.map(t=>
+  `<div class="step"><span class="sid">${t.id}</span><div class="snm">${t.full}</div><div class="sdc">${t.dc}</div></div>`).join("");
+
+// KPI: company + per-base progress
+(function(){
+  const fixed = BASES.reduce((s,b)=>s+b.money.fixed,0);
+  const soft  = BASES.reduce((s,b)=>s+b.money.fixed+b.money.soft+Math.round(b.money.pipe*0.3),0);
+  const ev    = BASES.reduce((s,b)=>s+b.done,0);
+  const total = GOAL*4;
+  const accents = ["var(--cyan)","var(--pink)","var(--yellow)","var(--green)"];
+  const company = `<div class="kpi" style="--bar:var(--green)">
+    <div class="lb">全社 — 加盟金確定 / 目標 1.2億</div>
+    <div class="num"><span class="ac-g">${fmt(fixed)}</span><span class="u">万円</span></div>
+    <div class="bar">
+      <i style="width:${soft/total*100}%;background:var(--pink);opacity:.45"></i>
+      <i style="width:${fixed/total*100}%;background:var(--green)"></i>
+    </div>
+    <div class="note">内諾込み <b class="ac-p">${fmt(soft)}</b> 万円 ／ 成立イベント <b class="ac-y">${ev}</b>/32</div>
+  </div>`;
+  const cards = BASES.map((b,i)=>{
+    const pct = Math.round(b.done/N_STEPS*100);
+    const nowT = TRIGGERS[Math.min(b.done,N_STEPS-1)];
+    return `<div class="kpi kpib" style="--bar:${accents[i]}" onclick="openDetail('${b.id}');document.getElementById('detail').scrollIntoView({behavior:'smooth'})">
+      <div class="bn">${b.name}<small>${b.en}</small></div>
+      <div class="pnum">${pct}<span class="u">%</span></div>
+      <div class="sub">成立 <b>${b.done}/${N_STEPS}</b> ｜ 加盟金 <b>${fmt(b.money.fixed)}</b>万<br>次: ${nowT.id} ${nowT.name}${(()=>{const d=ddl(b);return d?` ｜ <b style="color:${d.remain<=30?'var(--red)':'var(--yellow)'}">残${d.remain}日</b>`:"";})()}</div>
+    </div>`;
+  }).join("");
+  document.getElementById("kpis").innerHTML = company + cards;
+})();
+
+// prefecture silhouettes (simplified from dataofjapan/land)
+const PREF = {"saga": "M36.0 17.3 L50.3 16.1 L53.5 17.8 L56.5 15.6 L62.8 17.2 L66.6 16.0 L76.8 22.9 L81.9 23.8 L84.3 26.5 L83.8 28.8 L87.3 28.0 L88.1 25.4 L94.9 21.1 L100.0 22.2 L99.9 36.9 L96.6 36.7 L95.0 39.5 L92.6 38.7 L93.6 41.6 L89.6 43.2 L91.1 45.2 L89.2 46.0 L88.8 48.8 L86.5 44.6 L84.4 50.6 L81.3 49.6 L80.5 52.6 L78.8 52.2 L79.5 55.7 L74.6 58.3 L76.7 68.0 L68.0 67.0 L62.6 58.4 L62.7 60.0 L58.7 58.9 L60.7 60.6 L59.5 64.2 L50.2 72.3 L46.7 70.4 L47.5 72.9 L45.5 74.1 L49.0 75.1 L55.5 91.0 L59.4 93.5 L59.3 95.9 L42.0 93.5 L34.2 86.4 L32.1 86.7 L30.2 82.3 L20.9 75.7 L21.5 73.1 L25.2 71.7 L23.6 64.3 L16.6 65.6 L7.6 61.4 L6.1 57.3 L7.0 52.4 L-0.0 44.9 L4.0 37.2 L9.9 45.5 L12.1 44.7 L8.8 41.5 L11.5 39.0 L8.8 37.7 L11.4 37.8 L14.0 26.9 L8.2 26.2 L9.2 24.7 L3.1 19.7 L6.1 19.2 L4.5 17.1 L6.0 15.0 L10.2 18.5 L9.8 21.3 L12.7 19.8 L11.7 16.5 L10.4 17.3 L9.3 16.3 L11.0 15.9 L8.8 9.9 L12.5 11.8 L10.4 9.2 L12.5 9.7 L11.1 4.1 L14.9 6.9 L14.9 10.2 L17.6 5.0 L20.2 6.2 L21.7 4.8 L21.9 7.0 L25.4 8.1 L26.8 11.3 L22.8 15.9 L25.2 17.4 L26.2 15.2 L26.8 19.5 L33.5 20.9 L36.2 19.5 L36.0 17.3Z", "kumamoto": "M84.0 3.2 L87.6 6.9 L88.6 11.9 L91.6 14.3 L92.5 18.2 L95.2 21.2 L93.9 22.7 L94.6 28.6 L100.0 33.7 L95.3 34.3 L93.1 38.2 L93.8 39.1 L93.1 41.4 L89.0 44.3 L88.7 47.7 L86.4 47.4 L84.4 50.3 L84.6 53.5 L83.7 55.5 L79.6 55.2 L78.7 57.8 L77.1 58.7 L77.7 60.9 L76.6 61.3 L76.3 63.3 L77.3 68.0 L79.0 70.6 L80.7 70.8 L81.3 75.1 L84.0 77.6 L81.6 81.7 L79.6 81.3 L78.9 84.5 L81.1 85.6 L81.9 88.2 L83.2 88.7 L83.8 92.3 L80.1 92.7 L76.8 91.1 L73.8 95.7 L70.9 96.1 L68.8 94.7 L65.3 97.6 L58.1 97.8 L56.3 96.8 L53.9 97.0 L50.4 94.4 L50.2 93.1 L48.1 92.7 L46.8 90.0 L45.8 90.1 L45.1 92.8 L42.2 93.2 L42.0 94.3 L37.4 94.2 L37.3 95.6 L35.7 96.4 L32.0 95.8 L28.8 90.5 L30.2 90.9 L29.7 88.6 L31.9 85.7 L34.7 85.6 L33.5 84.4 L34.4 84.2 L33.8 83.2 L35.4 82.6 L35.4 81.1 L36.5 82.1 L36.5 80.5 L37.1 81.3 L38.3 80.5 L37.0 80.0 L36.5 77.8 L37.7 77.8 L37.8 76.2 L39.5 75.4 L38.3 74.4 L44.5 68.4 L44.2 64.8 L42.6 64.7 L42.2 63.1 L44.0 62.4 L43.1 61.8 L43.1 61.7 L44.5 61.9 L42.0 59.8 L43.6 59.4 L46.5 55.2 L48.9 53.7 L47.7 52.5 L49.4 51.9 L50.4 52.9 L50.8 51.3 L50.2 50.3 L46.0 52.0 L42.3 51.8 L36.1 53.4 L35.5 52.0 L36.1 51.1 L41.7 48.3 L44.0 45.4 L47.0 44.1 L47.0 41.3 L45.7 39.7 L47.5 37.2 L44.8 34.1 L45.3 32.9 L40.8 32.1 L40.8 29.5 L36.3 27.7 L36.2 26.2 L35.0 26.6 L33.9 19.5 L32.8 18.9 L39.5 18.9 L40.2 18.1 L38.9 14.6 L43.9 11.5 L43.6 10.1 L45.0 9.1 L50.8 9.5 L52.3 4.2 L53.1 5.9 L56.1 5.7 L64.5 11.1 L67.5 11.6 L68.4 13.5 L72.1 14.7 L73.6 17.1 L75.0 17.1 L76.6 15.4 L76.6 12.9 L77.6 11.5 L74.2 6.9 L75.2 3.2 L76.8 3.7 L80.1 2.2 L84.0 3.2Z M27.8 71.8 L28.0 69.6 L26.5 71.5 L21.6 70.5 L20.9 72.5 L19.6 72.7 L20.4 70.7 L17.9 68.7 L18.3 69.6 L17.5 69.7 L16.6 72.4 L18.5 72.1 L18.8 74.4 L17.3 77.9 L15.0 79.2 L15.3 76.7 L14.0 77.0 L13.9 79.1 L12.8 78.6 L12.6 80.3 L14.5 80.4 L13.0 81.7 L12.4 80.9 L10.2 84.1 L9.1 84.0 L9.8 85.6 L9.0 86.4 L9.1 85.1 L8.2 85.1 L8.1 87.7 L5.6 88.9 L4.4 87.6 L4.0 89.8 L3.2 88.7 L2.4 89.7 L1.7 88.9 L2.4 87.0 L2.7 87.9 L3.3 87.1 L3.1 85.6 L1.5 85.3 L2.3 84.2 L0.0 85.1 L3.3 80.2 L4.2 80.0 L4.7 82.3 L4.4 80.2 L6.1 79.9 L5.7 80.8 L6.8 82.1 L7.5 80.2 L5.4 78.9 L4.7 79.9 L4.2 78.7 L2.0 79.5 L0.7 77.5 L0.6 75.0 L5.8 63.7 L4.7 60.9 L3.3 60.2 L3.8 59.7 L5.0 59.5 L5.6 61.6 L11.0 58.5 L16.0 58.5 L16.9 59.6 L16.5 63.0 L17.6 65.1 L17.1 67.3 L23.6 64.1 L25.7 61.2 L30.5 60.6 L31.2 62.7 L33.1 60.6 L33.8 61.3 L36.2 60.1 L32.4 68.3 L33.4 68.6 L31.9 69.2 L32.0 71.9 L30.3 72.9 L29.2 72.4 L28.5 73.4 L27.8 71.8Z", "nagasaki": "M45.9 13.2 L45.2 12.8 L45.7 13.8 L44.7 15.0 L46.5 13.8 L46.2 15.1 L45.6 14.8 L45.9 15.7 L45.5 15.8 L46.3 16.1 L45.2 16.9 L46.1 16.8 L46.3 17.4 L45.2 17.2 L45.7 17.8 L45.7 18.5 L45.1 18.1 L45.4 18.5 L44.7 19.2 L44.8 18.6 L44.4 19.0 L44.0 18.2 L44.7 18.1 L44.3 17.3 L44.9 17.2 L44.2 16.4 L44.8 15.5 L44.0 16.1 L44.1 15.2 L43.5 15.8 L43.6 16.6 L43.0 17.3 L42.7 16.6 L43.0 16.5 L43.1 16.2 L42.9 16.5 L42.6 15.7 L43.2 15.1 L43.1 14.9 L42.4 15.5 L42.0 15.1 L42.4 15.6 L42.2 15.9 L42.0 15.8 L41.8 16.1 L42.6 16.5 L42.2 16.4 L42.2 17.2 L41.9 16.5 L42.0 16.9 L41.5 16.3 L40.8 16.7 L39.8 16.1 L40.4 15.8 L40.7 16.4 L41.7 15.6 L41.5 13.6 L42.0 13.6 L41.5 13.2 L41.9 13.1 L41.6 12.5 L42.4 12.8 L43.2 11.3 L42.0 12.1 L41.6 11.2 L42.9 8.4 L43.2 9.0 L43.4 7.9 L43.7 8.3 L44.4 8.1 L43.8 8.1 L42.9 6.5 L42.1 6.9 L43.5 2.7 L43.9 2.7 L43.9 3.3 L44.7 2.7 L45.1 3.2 L45.5 2.8 L46.4 3.2 L45.9 2.7 L46.8 1.4 L47.9 1.6 L47.2 0.7 L48.1 0.6 L48.5 0.0 L48.8 0.7 L49.0 0.3 L49.7 0.6 L49.5 1.6 L50.2 1.1 L49.8 1.8 L50.3 1.8 L49.1 2.5 L50.1 2.9 L49.3 3.7 L49.6 4.2 L48.9 4.3 L48.4 3.5 L48.7 4.4 L48.0 3.9 L47.8 4.2 L47.8 4.6 L48.4 4.3 L49.6 5.2 L49.4 7.0 L48.8 7.1 L48.9 7.8 L48.0 9.3 L45.3 11.9 L45.9 13.2Z M39.3 29.1 L39.2 27.8 L38.9 28.2 L38.1 27.5 L37.5 28.2 L38.9 17.6 L39.8 18.0 L39.6 19.3 L40.9 18.5 L41.1 19.5 L41.9 18.7 L42.0 19.7 L42.3 20.1 L42.2 18.8 L41.7 18.6 L41.3 18.1 L41.3 17.7 L42.1 18.4 L42.4 18.1 L42.5 19.0 L43.0 18.7 L42.7 19.2 L42.6 19.8 L42.9 20.1 L43.0 19.6 L43.1 19.8 L43.3 20.1 L43.3 19.2 L44.5 19.2 L44.7 20.1 L43.3 20.8 L43.6 22.5 L42.6 22.6 L42.6 24.0 L42.2 23.7 L42.5 25.5 L42.0 25.4 L41.9 27.0 L40.8 27.2 L41.1 27.7 L40.3 28.3 L39.9 27.8 L39.3 29.1Z M58.9 46.9 L57.9 46.5 L58.1 45.8 L57.4 45.8 L57.9 45.0 L57.2 44.3 L56.6 45.3 L56.1 43.9 L57.7 44.3 L57.3 43.4 L56.6 43.4 L56.4 42.4 L57.0 42.4 L56.3 42.1 L56.7 41.8 L57.3 42.6 L57.9 42.2 L57.2 40.7 L58.4 39.5 L61.1 40.4 L60.8 41.9 L60.0 42.0 L62.1 43.0 L60.5 43.5 L62.1 44.2 L61.7 45.2 L59.5 45.3 L58.9 46.9Z M45.6 71.9 L44.5 71.3 L44.8 70.2 L45.2 71.1 L46.5 71.4 L46.8 70.6 L45.8 70.2 L45.9 69.3 L46.9 68.6 L47.5 69.3 L47.3 68.7 L47.6 69.0 L47.9 68.7 L46.7 67.4 L46.8 66.8 L47.6 66.7 L47.5 66.3 L48.4 66.2 L47.8 65.2 L48.2 64.4 L48.0 63.6 L50.4 63.2 L50.9 62.0 L51.3 62.3 L51.0 63.2 L51.4 63.2 L51.4 62.1 L52.5 62.0 L51.4 61.7 L51.2 61.2 L52.6 60.7 L52.9 62.0 L52.5 62.6 L53.2 63.0 L52.2 63.5 L52.2 64.4 L51.0 64.4 L51.7 65.2 L50.5 65.8 L50.7 66.5 L49.9 66.5 L50.6 67.2 L50.5 67.7 L47.9 70.9 L45.6 71.9Z M55.7 62.9 L55.6 62.5 L56.6 62.6 L57.2 61.2 L57.7 61.8 L57.3 61.8 L57.0 62.9 L57.4 63.3 L58.1 62.9 L58.0 63.4 L58.9 63.6 L60.0 62.7 L61.0 63.3 L61.2 62.5 L61.8 62.6 L61.8 63.9 L60.6 66.3 L62.7 68.5 L62.5 70.0 L62.9 71.3 L65.6 72.5 L67.8 72.2 L68.2 74.4 L67.1 74.8 L67.0 75.6 L69.3 77.2 L70.1 78.7 L71.1 79.0 L72.4 80.5 L77.9 81.8 L77.8 83.1 L77.2 83.9 L74.3 85.2 L73.5 86.1 L73.6 86.4 L74.7 85.7 L75.4 86.7 L75.0 87.3 L75.6 86.8 L77.3 87.3 L79.5 85.7 L81.4 85.5 L83.2 86.6 L84.8 90.2 L84.6 92.1 L83.5 93.5 L83.9 94.1 L83.7 95.0 L81.8 96.1 L80.1 96.1 L80.1 96.9 L79.1 98.0 L77.3 98.0 L77.7 98.5 L76.6 99.0 L76.5 97.6 L75.1 96.7 L74.9 94.4 L75.5 94.9 L76.7 94.2 L77.9 92.9 L78.1 91.4 L77.2 90.9 L77.6 90.1 L77.0 89.5 L73.3 89.5 L70.9 91.1 L68.0 91.1 L68.3 91.9 L67.0 93.5 L66.6 93.3 L65.8 95.7 L63.6 96.7 L63.4 97.8 L61.4 99.4 L61.5 99.9 L60.8 99.4 L59.8 100.0 L59.7 99.5 L61.3 98.4 L62.8 96.0 L62.9 94.6 L62.3 94.9 L61.9 94.2 L63.3 93.6 L63.0 94.1 L63.6 94.4 L63.5 94.0 L63.9 94.0 L63.8 93.6 L64.6 92.9 L64.5 92.6 L64.9 92.0 L64.9 91.5 L64.0 92.9 L62.9 92.9 L63.3 91.8 L62.4 91.8 L62.7 91.1 L61.9 90.8 L62.2 90.3 L60.9 89.2 L61.2 88.3 L60.1 88.2 L59.7 88.9 L58.9 87.6 L58.4 87.8 L56.4 83.1 L55.9 83.7 L55.7 83.3 L55.4 80.8 L56.8 79.8 L56.2 78.2 L56.9 76.9 L57.5 76.9 L56.7 76.6 L57.4 76.2 L56.8 76.3 L57.4 75.8 L57.4 75.3 L58.5 76.1 L58.6 75.7 L59.1 76.2 L58.8 76.5 L59.4 76.3 L59.3 77.7 L60.2 77.0 L60.7 77.5 L59.6 79.1 L59.8 80.4 L60.9 79.9 L60.3 79.7 L60.8 78.9 L62.2 79.5 L63.0 80.6 L63.1 81.2 L62.4 81.6 L62.9 82.4 L62.5 83.7 L62.1 83.5 L62.2 82.7 L62.0 83.0 L62.1 82.0 L61.6 82.3 L61.9 83.9 L61.5 84.1 L61.8 84.5 L62.4 84.1 L62.6 84.8 L62.2 85.5 L61.8 85.2 L61.7 86.1 L62.8 86.2 L64.0 87.8 L64.2 86.4 L64.8 87.1 L65.3 85.4 L65.8 86.0 L66.0 85.5 L67.4 86.5 L68.1 86.3 L69.2 87.5 L70.3 87.0 L68.7 85.8 L68.9 85.0 L68.0 84.8 L68.3 84.3 L67.3 83.4 L67.2 81.3 L68.0 80.5 L67.9 79.2 L66.9 78.3 L65.0 76.8 L63.0 78.1 L63.0 77.2 L63.6 77.1 L62.1 76.8 L62.5 76.3 L62.0 75.9 L60.8 76.2 L61.0 75.1 L60.5 76.0 L61.4 77.0 L60.8 77.5 L60.5 76.8 L59.9 77.0 L60.2 76.3 L59.4 75.2 L60.3 75.2 L60.0 74.2 L60.6 74.5 L60.5 73.9 L61.1 73.9 L60.6 73.7 L60.8 73.2 L61.6 73.2 L60.4 73.0 L59.9 73.7 L59.5 73.5 L59.5 74.0 L59.1 73.4 L59.3 72.3 L58.3 72.2 L58.7 74.0 L58.3 74.0 L58.7 74.4 L57.1 74.3 L56.9 75.1 L56.6 73.7 L57.5 74.0 L58.2 73.2 L57.6 73.0 L57.2 72.0 L55.8 72.0 L56.6 71.2 L55.8 69.3 L55.9 70.5 L55.4 71.0 L55.2 69.7 L54.9 70.3 L54.4 70.2 L54.9 69.4 L54.2 70.1 L54.2 69.7 L52.6 69.7 L52.6 69.0 L53.1 69.1 L52.7 68.4 L53.4 67.5 L53.2 67.2 L54.0 66.9 L53.7 66.3 L54.6 65.3 L55.0 65.4 L55.2 65.3 L54.7 65.1 L53.8 65.5 L52.9 64.7 L53.4 64.3 L53.1 62.2 L54.3 62.0 L54.1 62.6 L55.0 62.3 L55.7 62.9Z M33.2 88.4 L32.6 88.0 L32.9 87.9 L32.5 85.7 L33.2 85.1 L32.4 84.2 L33.4 84.8 L33.6 84.3 L32.9 83.5 L32.0 83.6 L32.5 83.1 L32.3 82.3 L31.8 83.0 L31.4 82.2 L31.0 82.7 L30.7 82.4 L31.1 82.4 L30.8 81.5 L31.4 80.9 L32.1 81.7 L32.8 81.0 L32.8 81.9 L33.0 80.9 L33.5 80.7 L32.7 80.5 L32.6 78.5 L33.5 77.8 L33.6 78.9 L34.4 78.7 L33.9 77.2 L35.1 75.8 L34.6 74.2 L35.4 72.2 L34.9 74.0 L35.6 74.8 L35.4 76.9 L34.5 78.0 L34.7 79.7 L34.2 80.5 L35.2 80.7 L37.4 79.4 L38.1 79.7 L37.7 80.3 L38.0 81.1 L36.4 82.8 L35.5 82.7 L34.9 81.7 L35.1 83.3 L34.2 83.3 L34.6 84.4 L34.1 84.7 L34.8 86.4 L33.5 86.2 L33.2 88.4Z M22.0 99.8 L21.3 99.6 L20.7 98.3 L17.9 98.2 L17.3 99.0 L15.2 97.9 L15.7 96.4 L16.2 96.9 L15.7 97.3 L15.9 97.7 L16.3 97.3 L17.1 98.4 L17.9 97.2 L16.9 97.7 L16.7 97.0 L17.4 96.6 L17.0 96.0 L17.9 96.4 L17.3 95.9 L18.1 96.2 L17.8 95.4 L18.3 95.2 L17.2 94.8 L17.2 94.0 L17.7 93.9 L17.1 92.9 L17.3 91.7 L16.9 91.0 L17.8 89.9 L19.1 90.8 L18.9 92.1 L20.6 91.2 L20.2 91.7 L20.8 91.5 L20.5 92.1 L20.7 92.1 L21.4 90.7 L22.1 92.3 L22.1 91.5 L23.0 91.3 L22.8 90.8 L21.8 91.1 L23.4 89.3 L23.3 90.4 L24.1 91.0 L23.3 91.4 L24.4 91.0 L24.1 92.0 L24.3 91.5 L25.3 91.8 L24.7 92.0 L24.6 93.3 L25.0 94.4 L26.9 96.1 L26.7 96.6 L23.9 96.9 L23.5 96.0 L21.9 96.5 L21.6 97.6 L22.8 98.1 L22.8 98.9 L22.0 99.8Z", "oita": "M57.1 6.1 L58.3 5.2 L59.5 6.3 L60.3 4.6 L63.4 6.8 L64.3 5.6 L65.2 7.4 L66.6 6.9 L68.8 9.5 L72.6 17.1 L71.7 23.3 L72.4 23.4 L72.5 26.2 L71.4 26.5 L69.6 31.7 L66.3 31.5 L67.3 30.8 L66.0 30.2 L63.7 30.5 L65.4 33.9 L61.2 35.1 L60.9 37.4 L57.6 37.2 L56.6 35.4 L53.5 36.1 L54.5 44.8 L60.6 47.0 L64.0 44.5 L66.2 44.4 L67.2 45.7 L66.8 44.3 L68.1 45.1 L67.9 43.9 L68.7 43.8 L68.7 44.9 L69.8 44.3 L70.4 45.7 L70.9 45.1 L71.8 46.6 L72.9 46.3 L73.2 47.2 L74.1 47.5 L73.7 46.4 L75.2 47.1 L75.7 46.3 L75.1 47.5 L83.1 46.7 L82.7 45.8 L85.5 44.9 L83.1 47.9 L83.4 49.2 L82.2 50.9 L82.8 51.1 L80.1 53.1 L79.6 56.1 L77.2 58.3 L80.9 59.4 L85.3 57.6 L86.5 58.5 L81.6 61.9 L82.4 63.2 L86.1 62.5 L86.3 64.0 L87.5 64.0 L87.6 61.6 L88.6 61.2 L88.7 63.7 L90.5 63.4 L91.1 64.5 L93.4 61.2 L92.9 62.7 L94.5 64.8 L91.4 65.9 L87.6 65.4 L87.1 67.8 L85.4 69.4 L85.5 71.1 L85.2 69.8 L84.5 71.1 L90.0 75.5 L90.1 74.1 L90.7 74.8 L91.2 73.8 L91.8 76.1 L93.5 74.2 L93.5 76.8 L95.9 76.1 L95.8 74.7 L99.0 75.3 L100.0 76.7 L97.6 76.0 L96.8 77.3 L95.4 76.4 L93.9 77.5 L93.9 79.3 L91.4 77.7 L92.2 80.9 L92.8 79.9 L94.5 80.7 L92.0 83.4 L91.1 83.0 L90.1 84.9 L89.3 84.1 L89.8 85.3 L88.7 85.9 L89.8 85.8 L90.3 87.5 L90.4 85.6 L91.7 87.0 L91.2 85.1 L92.0 85.0 L93.9 86.6 L91.0 89.0 L91.0 90.1 L89.7 88.6 L88.2 90.7 L86.9 89.3 L86.9 90.7 L85.9 89.9 L85.5 90.7 L84.5 88.9 L85.0 92.6 L83.3 90.2 L83.1 93.8 L84.0 94.0 L84.2 94.5 L83.1 95.0 L81.1 95.4 L80.9 94.3 L82.0 87.3 L79.3 86.5 L76.8 87.2 L74.8 85.6 L72.4 86.2 L70.1 92.0 L60.9 91.7 L58.9 93.6 L54.6 92.2 L54.9 89.3 L51.5 85.8 L47.3 88.2 L42.4 88.9 L40.8 86.2 L34.8 81.8 L33.3 74.3 L34.7 72.6 L31.9 69.3 L30.9 65.1 L27.7 62.4 L26.6 57.0 L21.7 52.5 L16.9 51.9 L14.9 53.5 L13.2 52.9 L12.1 57.0 L15.7 62.0 L14.7 63.5 L14.7 66.3 L12.9 68.1 L11.4 68.1 L9.8 65.5 L5.8 64.2 L4.8 62.1 L1.1 60.7 L2.8 59.1 L4.9 52.6 L0.8 50.3 L2.6 48.5 L0.0 47.8 L0.3 45.9 L3.3 45.0 L2.1 43.9 L3.2 42.5 L2.5 39.3 L0.7 37.7 L3.1 34.5 L4.8 34.3 L5.5 28.0 L7.9 26.9 L7.9 25.0 L11.8 22.4 L16.2 21.2 L23.5 22.7 L27.9 22.1 L27.0 20.2 L28.7 18.5 L27.5 14.7 L28.5 11.9 L32.2 13.3 L33.3 12.4 L36.8 15.5 L48.0 15.9 L47.5 14.2 L50.5 11.6 L51.1 12.3 L52.0 9.5 L53.9 8.1 L53.4 6.8 L55.9 6.4 L55.3 5.4 L57.1 6.1Z"};
+
+// deadline & prep helpers
+function ddl(b){
+  if(!b.start) return null;
+  const start = new Date(b.start);
+  const end = new Date(start.getTime() + DEADLINE_DAYS*86400000);
+  const remain = Math.ceil((end - TODAY)/86400000);
+  const pct = Math.min(100, Math.max(0, (TODAY - start)/(DEADLINE_DAYS*86400000)*100));
+  return {remain, pct, end: `${end.getMonth()+1}/${end.getDate()}`};
+}
+function prepCount(b){ return PREP_ROLES.filter(r=>b.prep[r.k].s===2).length; }
+function prepDots(b){
+  return PREP_ROLES.map(r=>{
+    const s = b.prep[r.k].s;
+    const c = s===2 ? "background:var(--green);border-color:var(--green)" : (s===1 ? "border-color:var(--yellow);background:var(--yellow)" : "border-color:var(--lgray)");
+    return `<span class="pd" style="${c}" title="${r.l}：${b.prep[r.k].n}"></span>`;
+  }).join("");
+}
+
+// comparison cards
+function moneyBar(m){
+  const w = v => Math.min(100, v/GOAL*100);
+  return `<div class="mtrack">
+    <i style="left:0;width:${w(m.fixed+m.soft+m.pipe*0.3)}%;background:var(--cyan);opacity:.5"></i>
+    <i style="left:0;width:${w(m.fixed+m.soft)}%;background:var(--pink)"></i>
+    <i style="left:0;width:${w(m.fixed)}%;background:var(--green)"></i></div>`;
+}
+function silhouette(id, prog){
+  const y = 100 - prog*100;
+  return `<svg class="sil" viewBox="-4 -4 108 108" preserveAspectRatio="xMidYMid meet">
+    <defs><clipPath id="clip-${id}"><path d="${PREF[id]}"/></clipPath></defs>
+    <path d="${PREF[id]}" fill="#F4F4F1" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>
+    <g clip-path="url(#clip-${id})">
+      <rect x="-4" y="${y}" width="108" height="${prog*100+4}" fill="var(--ink)"/>
+      ${prog>0 ? `<rect x="-4" y="${y-1.5}" width="108" height="1.5" fill="var(--pink)"/>`:""}
+    </g>
+  </svg>`;
+}
+document.getElementById("board").innerHTML = BASES.map(b=>{
+  const prog = b.done/N_STEPS;
+  const chain = TRIGGERS.map((t,i)=>{
+    const dot = `<span class="cd ${i<b.done?'done':(i===b.done?'now':'')}" title="${t.id} ${t.full}"></span>`;
+    return (i>0?`<span class="cl ${i < b.done ? 'done':''}"></span>`:"") + dot;
+  }).join("");
+  const m = b.money;
+  const nowT = TRIGGERS[Math.min(b.done,N_STEPS-1)];
+  return `<div class="card" onclick="openDetail('${b.id}')">
+    <div class="ctop">
+      <div class="cn">${b.name}<small>${b.en}</small></div>
+      <div class="pct">${b.done}<small>/${N_STEPS} 成立</small></div>
+    </div>
+    ${silhouette(b.id, prog)}
+    <div class="chain">${chain}</div>
+    <div class="mrow"><span>加盟金</span><span><b>${fmt(m.fixed)}</b> / ${fmt(GOAL)}万</span></div>
+    ${moneyBar(m)}
+    <div class="fgrid">
+      <div class="fg"><span class="fl">興味人材</span> <span class="fv">${b.fuels.interest}名</span><div class="ft"><i style="width:${Math.min(100,b.fuels.interest/10*100)}%;background:var(--ink)"></i></div></div>
+      <div class="fg"><span class="fl">会員LOI</span> <span class="fv">${b.fuels.loi}社</span><div class="ft"><i style="width:${Math.min(100,b.fuels.loi/20*100)}%;background:var(--cyan)"></i></div></div>
+      <div class="fg"><span class="fl">学生登録</span> <span class="fv">${b.fuels.students}名</span><div class="ft"><i style="width:${Math.min(100,b.fuels.students/100*100)}%;background:var(--pink)"></i></div></div>
+      <div class="fg"><span class="fl">ﾊﾟｰﾄﾅｰ校</span> <span class="fv">${b.fuels.univ}/8</span><div class="ft"><i style="width:${Math.min(100,b.fuels.univ/8*100)}%;background:var(--green)"></i></div></div>
+    </div>
+    <div class="prep-row"><span class="fl">準備室ロール</span><span class="pdots">${prepDots(b)}</span><span class="fv">${prepCount(b)}/5</span></div>
+    ${(()=>{const d=ddl(b); if(!d) return `<div class="ddl idle">⏱ T1成立で3ヶ月時計スタート</div>`;
+      const warn = d.remain<=30;
+      return `<div class="ddl"><span>⏱ T7（3000万）期限 ${d.end}</span><b style="color:${warn?'var(--red)':'var(--ink)'}">残り${d.remain}日</b>
+        <div class="dt"><i style="width:${d.pct}%;background:${warn?'var(--red)':'var(--ink)'}"></i></div></div>`;})()}
+    <span class="nx"><b>NEXT</b>${nowT.id} ${nowT.full}</span>
+  </div>`;
+}).join("");
+
+// detail
+function openDetail(id){
+  const b = BASES.find(x=>x.id===id);
+  const d = document.getElementById("detail");
+  const m = b.money;
+  const softAll = m.fixed+m.soft, pipeAll = softAll + m.pipe;
+  const hist = b.history.length
+    ? b.history.map(h=>`<li><div class="td">${h.d}</div><div class="tt">${h.t}</div><div class="tx">${h.x}</div></li>`).join("")
+    : `<li class="pending"><div class="tt dim">まだ記録がありません</div><div class="tx">最初のトリガー成立を待っています。</div></li>`;
+  const sh = STAKE.filter(s=>s.b===b.name);
+  const shRows = sh.map(s=>{
+    const st = STATUS[s.st];
+    return `<tr><td>${s.name}${s.samp?'<span class="samp">サンプル</span>':''}</td>
+      <td class="dim">${s.cat}</td>
+      <td><span class="stat ${st.fill?'filled':''}" style="--dc:${st.c}">${s.st}</span></td></tr>`;
+  }).join("");
+  d.innerHTML = `
+    <div class="dhead">
+      <h2>${b.name}</h2><span class="en" style="font-size:10px;color:var(--gray)">${b.en}</span>
+      <span class="st">次のトリガー：${b.next.title}</span>
+      ${(()=>{const d=ddl(b);return d?`<span class="st" style="color:${d.remain<=30?'var(--red)':'#fff'}">⏱ T7期限 ${d.end}（残り${d.remain}日）</span>`:"";})()}
+      <button class="x" onclick="document.getElementById('detail').classList.remove('on')">×</button>
+    </div>
+    <div class="dgrid">
+      <div class="dcol">
+        <h3>3-Layer Gauges</h3>
+        <div class="layer">
+          <div class="ln"><b>🏦 オーナー加盟金</b><span class="v" style="color:var(--green)">${fmt(m.fixed)}<small style="font-size:11px;color:var(--lgray)"> / ${fmt(GOAL)}万</small></span></div>
+          ${moneyBar(m)}
+          <div class="cap">
+            <span><span class="sw" style="background:var(--green)"></span>確定 ${fmt(m.fixed)}万</span>
+            <span><span class="sw" style="background:var(--pink)"></span>内諾 ${fmt(m.soft)}万</span>
+            <span><span class="sw" style="background:var(--cyan);opacity:.5"></span>商談見込 ${fmt(m.pipe)}万×30%</span>
+          </div>
+        </div>
+        <div class="layer">
+          <div class="ln"><b>🏢 会員（参加企業）</b><span class="v" style="color:var(--cyan)">${b.fuels.loi}<small style="font-size:11px;color:var(--lgray)"> LOI</small></span></div>
+          <div class="track"><i style="width:${Math.min(100,b.fuels.loi/20*100)}%;background:var(--cyan)"></i></div>
+          <div class="cap"><span>目標：オーナー会談までにLOI 20社（説得材料）</span></div>
+        </div>
+        <div class="layer">
+          <div class="ln"><b>🎓 学生エコシステム</b><span class="v" style="color:var(--pink)">${b.fuels.students}<small style="font-size:11px;color:var(--lgray)"> 名登録</small></span></div>
+          <div class="track"><i style="width:${Math.min(100,b.fuels.students/100*100)}%;background:var(--pink)"></i></div>
+          <div class="cap"><span>パートナー校 ${b.fuels.univ}/8</span><span>学生事務局 ${b.id==='oita'?'事務局長候補 検討中':'未組成'}</span></div>
+        </div>
+        <h3 style="margin-top:6px">準備室ロール（T3の成立条件：各1名以上）</h3>
+        <table style="margin-bottom:16px"><tbody>
+        ${PREP_ROLES.map(r=>{
+          const p=b.prep[r.k];
+          const lab = p.s===2?"確保":(p.s===1?"検討中":"未");
+          const col = p.s===2?"var(--green)":(p.s===1?"var(--yellow)":"var(--lgray)");
+          return `<tr><td style="width:38%"><b>${r.l}</b></td><td class="dim">${p.n}</td><td style="width:70px"><span class="stat ${p.s>0?'filled':''}" style="--dc:${col}">${lab}</span></td></tr>`;}).join("")}
+        </tbody></table>
+        <div class="nextact">
+          <div class="nl">NEXT TRIGGER</div>
+          <div class="nv">${b.next.title}</div>
+          <div class="nd">${b.next.note}<br>${b.next.ready}</div>
+        </div>
+        ${b.id==='oita' ? `<button class="demo-btn" onclick="celebrate('T3','準備室発足 成立','大分 — 5ロールが揃い、役割を持つ当事者チームが誕生')">▶ デモ：イベント成立の演出を見る</button>`:""}
+      </div>
+      <div class="dcol">
+        <h3>Trigger Log</h3>
+        <ul class="tl">${hist}</ul>
+        <h3 style="margin-top:24px">Stakeholders（${sh.length}）</h3>
+        <table><tbody>${shRows || '<tr><td class="dim">未登録</td></tr>'}</tbody></table>
+      </div>
+    </div>`;
+  d.classList.add("on");
+  d.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+// stakeholder view
+const cats = ["すべて","オーナー候補","教育機関","自治体・メディア","事務局","学生事務局"];
+const baseNames = ["すべて","熊本","長崎","佐賀","大分"];
+let fB="すべて", fC="すべて";
+function chips(el, arr, cur, cb){
+  document.getElementById(el).innerHTML = arr.map(a=>`<button class="${a===cur?'on':''}" onclick="${cb}('${a}')">${a}</button>`).join("");
+}
+function setB(v){fB=v;renderStake()} function setC(v){fC=v;renderStake()}
+function stale(s){
+  if(s.st==="未アプローチ"||s.st==="確定"||s.st==="見送り") return false;
+  if(!s.next) return true;
+  if(s.ap && (new Date("2026-07-02") - new Date(s.ap))/86400000 > 14) return true;
+  return false;
+}
+function renderStake(){
+  chips("f-base", baseNames, fB, "setB");
+  chips("f-cat", cats, fC, "setC");
+  const rows = STAKE.filter(s=>(fB==="すべて"||s.b===fB)&&(fC==="すべて"||s.cat===fC));
+  document.getElementById("stbody").innerHTML = rows.map(s=>{
+    const st = STATUS[s.st];
+    const isStale = stale(s);
+    return `<tr class="row">
+      <td>${s.b}</td>
+      <td class="dim">${s.cat}</td>
+      <td><b>${s.name}</b>${s.samp?'<span class="samp">サンプル</span>':''}</td>
+      <td class="dim">${s.p}</td>
+      <td><span class="stat ${st.fill?'filled':''}" style="--dc:${st.c}">${s.st}</span></td>
+      <td class="amtcell" style="color:${s.amt?'var(--white)':'var(--gray)'}">${s.amt?fmt(s.amt):"—"}</td>
+      <td class="dim">${s.ap||"—"}</td>
+      <td>${s.next ? s.next : (isStale?'<span class="alert">⚠ 次回アクション未設定</span>':'<span class="dim">—</span>')}${(s.next&&isStale)?' <span class="alert">⚠ 14日以上停滞</span>':''}</td>
+    </tr>`;
+  }).join("");
+}
+renderStake();
+
+// feed
+document.getElementById("feedlist").innerHTML = FEED.map(f=>`
+  <li class="${f.big?'big':''}">
+    <span class="fd">${f.d}</span>
+    <span class="fk" style="color:${f.big?'var(--ink)':'var(--gray)'}">${f.b}</span>
+    <span class="fb">${f.big?`<span class="mk">⚡ ${f.t}</span>`:f.t}<small>${f.x}</small></span>
+  </li>`).join("");
+
+
+/* ================= WHITEBOARD MAP ================= */
+const ETYPES = [
+  {k:"紹介",     c:"#00C0F0"},
+  {k:"協力",     c:"#50F000"},
+  {k:"出資検討", c:"#F03090"},
+  {k:"連携",     c:"#0A0A0A"}
+];
+let mBase = "大分", mEdgeType = "紹介";
+const MAPSTATE = {}; // base -> {nodes:[{id,label,sub,st,hub,x,y}], edges:[{a,b,t}]}
+
+function seedMap(base){
+  const W = 1100, H = 600;
+  const nodes = [{id:"hub", label:"NEO "+base, sub:"サテライト拠点", st:null, hub:true, x:W*0.42, y:H*0.42}];
+  // intro person from prep roster (not always in STAKE)
+  const b = BASES.find(x=>x.name===base);
+  if(b && b.prep.intro.s>0 && !STAKE.some(s=>s.b===base && s.cat==="紹介役")){
+    nodes.push({id:"intro", label:b.prep.intro.n, sub:"現地紹介役", st:"確定", x:W*0.12, y:H*0.40});
+  }
+  const zones = {"オーナー候補":[0.10,0.10],"教育機関":[0.68,0.12],"自治体・メディア":[0.12,0.72],"事務局":[0.68,0.70],"学生事務局":[0.72,0.40]};
+  const cnt = {};
+  STAKE.filter(s=>s.b===base).forEach((s,i)=>{
+    const z = zones[s.cat] || [0.45,0.75];
+    cnt[s.cat] = (cnt[s.cat]||0);
+    nodes.push({id:"s"+i, label:s.name.replace("（リスト作成中）","リスト作成中"), sub:s.cat + (s.samp?"（サンプル）":""), st:s.st,
+      x: 1100*z[0] + (cnt[s.cat]%2)*195, y: 600*z[1] + Math.floor(cnt[s.cat]/2)*74});
+    cnt[s.cat]++;
+  });
+  // seed edges for 大分 to demo the concept
+  let edges = [];
+  if(base==="大分"){
+    const find = t => nodes.find(n=>n.label.includes(t));
+    const jl=find("ジェイリース"), apu=find("APU"), k=find("K氏"), intro=nodes.find(n=>n.id==="intro");
+    if(intro&&jl) edges.push({a:intro.id,b:jl.id,t:"紹介"});
+    if(intro&&apu) edges.push({a:intro.id,b:apu.id,t:"紹介"});
+    if(jl) edges.push({a:jl.id,b:"hub",t:"出資検討"});
+    if(apu) edges.push({a:apu.id,b:"hub",t:"連携"});
+    if(k) edges.push({a:k.id,b:"hub",t:"協力"});
+  }
+  return {nodes, edges};
+}
+function getState(){ if(!MAPSTATE[mBase]) MAPSTATE[mBase]=seedMap(mBase); return MAPSTATE[mBase]; }
+function resetMap(){ delete MAPSTATE[mBase]; renderMap(); }
+
+function renderMapTools(){
+  document.getElementById("f-mbase").innerHTML = ["熊本","長崎","佐賀","大分"].map(n=>
+    `<button class="${n===mBase?'on':''}" onclick="mBase='${n}';renderMap()">${n}</button>`).join("");
+  document.getElementById("mtypes").innerHTML = ETYPES.map(t=>
+    `<button class="${t.k===mEdgeType?'on':''}" onclick="mEdgeType='${t.k}';renderMapTools()"><i style="background:${t.c}"></i>${t.k}</button>`).join("");
+}
+function nodeCenter(el, cv){
+  const r = el.getBoundingClientRect(), c = cv.getBoundingClientRect();
+  return {x: r.left - c.left + r.width/2, y: r.top - c.top + r.height/2};
+}
+function renderEdges(){
+  const cv = document.getElementById("canvas");
+  const svg = document.getElementById("edges");
+  const st = getState();
+  svg.innerHTML = st.edges.map((e,i)=>{
+    const ea = cv.querySelector(`[data-id="${e.a}"]`), eb = cv.querySelector(`[data-id="${e.b}"]`);
+    if(!ea||!eb) return "";
+    const a = nodeCenter(ea,cv), b = nodeCenter(eb,cv);
+    const col = (ETYPES.find(t=>t.k===e.t)||ETYPES[0]).c;
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${col}" stroke-width="2.5" onclick="delEdge(${i})">
+      <title>${e.t}（クリックで削除）</title></line>
+      <text x="${mx+6}" y="${my-6}" onclick="delEdge(${i})">${e.t}</text>`;
+  }).join("") + `<line id="tmpline" x1="0" y1="0" x2="0" y2="0" stroke="#F03090" stroke-width="2" stroke-dasharray="5 4" visibility="hidden" pointer-events="none"/>`;
+}
+function delEdge(i){ getState().edges.splice(i,1); renderEdges(); }
+
+function renderMap(){
+  renderMapTools();
+  const cv = document.getElementById("canvas");
+  const st = getState();
+  cv.querySelectorAll(".mnode").forEach(n=>n.remove());
+  st.nodes.forEach(n=>{
+    const d = document.createElement("div");
+    d.className = "mnode" + (n.hub?" mhub":"");
+    d.dataset.id = n.id;
+    d.style.left = n.x+"px"; d.style.top = n.y+"px";
+    const stc = n.st && STATUS[n.st] ? STATUS[n.st].c : null;
+    d.innerHTML = `<b>${n.label}</b><small>${n.sub}${n.st?` ｜ ${n.st}`:""}</small>
+      ${stc?`<span class="msd" style="background:${stc}"></span>`:""}
+      <span class="mport" title="ドラッグして別のカードへ"></span>`;
+    cv.appendChild(d);
+  });
+  renderEdges();
+}
+
+/* drag & link interactions */
+(function(){
+  const cv = document.getElementById("canvas");
+  let drag=null, link=null;
+  cv.addEventListener("pointerdown", e=>{
+    const port = e.target.closest(".mport");
+    const node = e.target.closest(".mnode");
+    if(port && node){
+      link = {from: node.dataset.id};
+      e.preventDefault();
+      return;
+    }
+    if(node){
+      const st = getState();
+      const n = st.nodes.find(x=>x.id===node.dataset.id);
+      const cr = cv.getBoundingClientRect();
+      drag = {n, el:node, dx: e.clientX-cr.left-n.x, dy: e.clientY-cr.top-n.y};
+      e.preventDefault();
+    }
+  });
+  window.addEventListener("pointermove", e=>{
+    const cr = cv.getBoundingClientRect();
+    if(drag){
+      drag.n.x = Math.max(0, Math.min(cr.width-140, e.clientX-cr.left-drag.dx));
+      drag.n.y = Math.max(0, Math.min(cr.height-54, e.clientY-cr.top-drag.dy));
+      drag.el.style.left = drag.n.x+"px"; drag.el.style.top = drag.n.y+"px";
+      renderEdges();
+    }
+    if(link){
+      const from = cv.querySelector(`[data-id="${link.from}"]`);
+      if(!from) return;
+      const a = nodeCenter(from,cv);
+      const tl = document.getElementById("tmpline");
+      tl.setAttribute("x1",a.x); tl.setAttribute("y1",a.y);
+      tl.setAttribute("x2",e.clientX-cr.left); tl.setAttribute("y2",e.clientY-cr.top);
+      tl.setAttribute("visibility","visible");
+      cv.querySelectorAll(".mnode").forEach(n=>n.classList.remove("linktarget"));
+      const tgt = document.elementFromPoint(e.clientX,e.clientY)?.closest(".mnode");
+      if(tgt && tgt.dataset.id!==link.from) tgt.classList.add("linktarget");
+    }
+  });
+  window.addEventListener("pointerup", e=>{
+    if(link){
+      const tgt = document.elementFromPoint(e.clientX,e.clientY)?.closest(".mnode");
+      if(tgt && tgt.dataset.id !== link.from){
+        const st = getState();
+        if(!st.edges.some(x=>(x.a===link.from&&x.b===tgt.dataset.id)||(x.b===link.from&&x.a===tgt.dataset.id)))
+          st.edges.push({a:link.from, b:tgt.dataset.id, t:mEdgeType});
+      }
+      cv.querySelectorAll(".mnode").forEach(n=>n.classList.remove("linktarget"));
+      document.getElementById("tmpline")?.setAttribute("visibility","hidden");
+      renderEdges();
+      link=null;
+    }
+    drag=null;
+  });
+})();
+
+// tabs
+document.querySelectorAll("nav.tabs button").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("on"));
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+    btn.classList.add("on");
+    document.getElementById("v-"+btn.dataset.v).classList.add("on");
+    if(btn.dataset.v==="map") renderMap();
+  });
+});
+
+// celebration
+function celebrate(k,t,s){
+  document.getElementById("ce-k").textContent = "TRIGGER " + k;
+  document.getElementById("ce-t").textContent = t;
+  document.getElementById("ce-s").textContent = s;
+  const c = document.getElementById("cele");
+  c.classList.remove("on"); void c.offsetWidth; c.classList.add("on");
+}
+</script>
+</body>
+</html>
