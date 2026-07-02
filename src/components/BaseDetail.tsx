@@ -1,14 +1,82 @@
 "use client";
 
-import type { BaseView, Trigger, Stakeholder, StatusDef } from "@/lib/types";
+import { useState } from "react";
+import type { BaseView, Trigger, Stakeholder, StatusDef, PrepState } from "@/lib/types";
 import { YEN, pct } from "@/lib/domain";
+import { updatePrepAssignment, recordFuelMetrics } from "@/app/actions";
 import MoneyBar from "./MoneyBar";
+
+const PREP_CYCLE: Record<PrepState, PrepState> = { 未: "検討中", 検討中: "確保", 確保: "未" };
+
+function FuelModal({
+  base,
+  recorderName,
+  onClose,
+}: {
+  base: BaseView;
+  recorderName: string;
+  onClose: () => void;
+}) {
+  const [v, setV] = useState({ ...base.fuels });
+  const [busy, setBusy] = useState(false);
+  const fields: { key: keyof typeof v; label: string }[] = [
+    { key: "interest", label: "興味人材（名）" },
+    { key: "loi", label: "会員LOI（社）" },
+    { key: "students", label: "学生登録（名）" },
+    { key: "partner_univ", label: "パートナー校" },
+  ];
+  async function save() {
+    setBusy(true);
+    const changed = Object.fromEntries(
+      fields.filter((f) => v[f.key] !== base.fuels[f.key]).map((f) => [f.key, v[f.key]]),
+    );
+    await recordFuelMetrics({ baseCode: base.code, values: changed, actorName: recorderName });
+    setBusy(false);
+    onClose();
+  }
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <div>
+            <div className="mk">FUEL</div>
+            <h3>{base.name} — 燃料を記録</h3>
+          </div>
+          <button className="x" onClick={onClose} aria-label="閉じる">×</button>
+        </div>
+        <div className="mbd">
+          <p style={{ fontSize: 12, color: "var(--gray)", lineHeight: 1.7 }}>
+            件数・金額は「次のトリガーを起こす燃料」。最新値を追記します（履歴は残ります）。
+          </p>
+          {fields.map((f) => (
+            <div key={f.key}>
+              <label>{f.label}</label>
+              <input
+                type="number"
+                value={v[f.key]}
+                min={0}
+                onChange={(e) => setV((p) => ({ ...p, [f.key]: Number(e.target.value) }))}
+              />
+            </div>
+          ))}
+          <div className="mfoot">
+            <button className="save" onClick={save} disabled={busy}>
+              {busy ? "保存中…" : "記録する"}
+            </button>
+            <button className="cancel" onClick={onClose}>キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function BaseDetail({
   base,
   triggers,
   stakeholders,
   statuses,
+  recorderName,
   onRecord,
   onClose,
 }: {
@@ -16,9 +84,19 @@ export default function BaseDetail({
   triggers: Trigger[];
   stakeholders: Stakeholder[];
   statuses: StatusDef[];
+  recorderName: string;
   onRecord: (triggerCode: string, triggerName: string) => void;
   onClose: () => void;
 }) {
+  // 準備室ロールの楽観的上書き（roleName → state）
+  const [prepOverride, setPrepOverride] = useState<Record<string, PrepState>>({});
+  const [showFuel, setShowFuel] = useState(false);
+
+  async function cyclePrep(roleName: string, current: PrepState) {
+    const next = PREP_CYCLE[current];
+    setPrepOverride((o) => ({ ...o, [roleName]: next }));
+    await updatePrepAssignment({ baseCode: base.code, roleName, state: next, actorName: recorderName });
+  }
   const m = base.money;
   const sh = stakeholders.filter((s) => s.baseCode === base.code);
   const nextT = triggers.find((t) => t.code === base.next.code);
@@ -137,8 +215,9 @@ export default function BaseDetail({
           <table style={{ marginBottom: 16 }}>
             <tbody>
               {base.prep.map((p) => {
+                const state = prepOverride[p.roleName] ?? p.state;
                 const col =
-                  p.state === "確保" ? "var(--green)" : p.state === "検討中" ? "var(--yellow)" : "var(--lgray)";
+                  state === "確保" ? "var(--green)" : state === "検討中" ? "var(--yellow)" : "var(--lgray)";
                 return (
                   <tr key={p.roleName}>
                     <td style={{ width: "38%" }}>
@@ -147,10 +226,12 @@ export default function BaseDetail({
                     <td className="dim">{p.stakeholderName ?? "—"}</td>
                     <td style={{ width: 70 }}>
                       <span
-                        className={`stat ${p.state !== "未" ? "filled" : ""}`}
-                        style={{ ["--dc" as string]: col }}
+                        className={`stat ${state !== "未" ? "filled" : ""}`}
+                        style={{ ["--dc" as string]: col, cursor: "pointer" }}
+                        title="クリックで 未 → 検討中 → 確保 を切替"
+                        onClick={() => cyclePrep(p.roleName, state)}
                       >
-                        {p.state}
+                        {state}
                       </span>
                     </td>
                   </tr>
@@ -177,6 +258,9 @@ export default function BaseDetail({
 
           <button className="rec-btn" onClick={() => onRecord(base.next.code, base.next.name)}>
             ▶ イベント成立を記録
+          </button>{" "}
+          <button className="rec-btn" style={{ borderColor: "var(--cyan)", color: "var(--cyan)" }} onClick={() => setShowFuel(true)}>
+            ⛽ 燃料を記録
           </button>
         </div>
 
@@ -229,6 +313,8 @@ export default function BaseDetail({
           </table>
         </div>
       </div>
+
+      {showFuel && <FuelModal base={base} recorderName={recorderName} onClose={() => setShowFuel(false)} />}
     </div>
   );
 }

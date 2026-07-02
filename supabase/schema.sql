@@ -333,6 +333,41 @@ drop trigger if exists trg_log_prep on prep_assignments;
 create trigger trg_log_prep after insert or update on prep_assignments
   for each row execute function log_prep_change();
 
+-- 燃料記録
+create or replace function log_fuel_change()
+returns trigger language plpgsql as $$
+declare label text;
+begin
+  label := case new.metric
+    when 'interest' then '興味人材'
+    when 'loi' then '会員LOI'
+    when 'students' then '学生登録'
+    when 'partner_univ' then 'パートナー校'
+    else new.metric end;
+  insert into activities(base_id, kind, title, body, is_big, actor_name)
+  values (new.base_id, 'fuel', format('%s → %s', label, new.value), null, false, new.recorded_by);
+  return new;
+end;
+$$;
+drop trigger if exists trg_log_fuel on fuel_metrics;
+create trigger trg_log_fuel after insert on fuel_metrics
+  for each row execute function log_fuel_change();
+
+-- 拠点追加時に準備室5ロールの割当行を自動作成
+-- （bases に1行 INSERT するだけでボード・準備室表示が成立する）
+create or replace function init_prep_assignments()
+returns trigger language plpgsql as $$
+begin
+  insert into prep_assignments(base_id, role_id, state)
+  select new.id, r.id, '未' from prep_role_defs r
+  on conflict (base_id, role_id) do nothing;
+  return new;
+end;
+$$;
+drop trigger if exists trg_init_prep on bases;
+create trigger trg_init_prep after insert on bases
+  for each row execute function init_prep_assignments();
+
 -- =========================== RLS ===========================
 -- anon の書き込みは全面拒否、select は Realtime / 読み取り用に許可（社内利用）。
 -- 書き込みは Next.js の Route Handler / Server Action が service_role で行う。

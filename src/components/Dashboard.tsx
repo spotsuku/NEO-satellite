@@ -83,24 +83,50 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     if (data.usingSupabase) router.refresh();
   }
 
-  // Realtime: 他メンバーの成立を購読（Supabase モードのみ）
+  // Realtime: 他メンバーの更新を購読（Supabase モードのみ）。
+  // 成立演出は activities(is_big) 起点 — 拠点名・T名・証拠つきのリッチ表示。
   useEffect(() => {
     if (!data.usingSupabase) return;
     const db = getBrowserClient();
     if (!db) return;
+    const baseNameById = new Map(data.bases.map((b) => [b.id, b.name]));
+    const baseCodeById = new Map(data.bases.map((b) => [b.id, b.code]));
     const ch = db
       .channel("neo-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "trigger_events" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activities" }, (payload) => {
         router.refresh();
-        setCele({ code: "", title: "トリガーが成立しました", subtitle: "拠点の進捗が動きました。ボードを更新します。" });
+        const row = payload.new as {
+          title?: string;
+          body?: string | null;
+          is_big?: boolean;
+          base_id?: string | null;
+        };
+        if (!row?.is_big) return;
+        const tCode = /^T\d+/.exec(row.title ?? "")?.[0] ?? "";
+        const baseCode = row.base_id ? baseCodeById.get(row.base_id) : undefined;
+        // 自分が起こした成立（ローカル演出済み）は二重発火しない
+        const localKey = `${baseCode}:${tCode}`;
+        if (baseCode && tCode && recentLocal.current.has(localKey)) {
+          recentLocal.current.delete(localKey);
+          return;
+        }
+        const baseName = row.base_id ? (baseNameById.get(row.base_id) ?? "") : "";
+        setCele({
+          code: tCode,
+          title: row.title ?? "トリガー成立",
+          subtitle: `${baseName}${baseName ? " — " : ""}${(row.body ?? "").slice(0, 80)}`,
+        });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "stakeholders" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "activities" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_nodes" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "map_edges" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "prep_assignments" }, () => router.refresh())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "fuel_metrics" }, () => router.refresh())
       .subscribe();
     return () => {
       db.removeChannel(ch);
     };
-  }, [data.usingSupabase, router]);
+  }, [data.usingSupabase, data.bases, router]);
 
   const selectedBase = selected ? data.bases.find((b) => b.code === selected) ?? null : null;
 
@@ -124,7 +150,10 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           </div>
           <button className="name-btn" onClick={() => setShowName(true)} style={{ marginTop: 6 }}>
             記録者：<b>{name || "未設定"}</b>
-          </button>
+          </button>{" "}
+          <a href="/settings" className="name-btn" style={{ display: "inline-block", textDecoration: "none" }}>
+            ⚙ 設定
+          </a>
         </div>
       </header>
 
@@ -157,6 +186,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
                 triggers={data.triggers}
                 stakeholders={data.stakeholders}
                 statuses={data.statuses}
+                recorderName={name || "匿名"}
                 onRecord={(code, tname) => openRecord(selectedBase.code, code, tname)}
                 onClose={() => setSelected(null)}
               />
@@ -187,6 +217,10 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
               stakeholders={data.stakeholders}
               relTypes={data.relTypes}
               statuses={data.statuses}
+              usingSupabase={data.usingSupabase}
+              mapNodes={data.mapNodes}
+              mapEdges={data.mapEdges}
+              recorderName={name || "匿名"}
             />
           )}
         </section>

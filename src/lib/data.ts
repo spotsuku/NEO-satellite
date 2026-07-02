@@ -49,6 +49,10 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     prep,
     fuels,
     activities,
+    mapNodes,
+    mapEdges,
+    fuelTargets,
+    settings,
   ] = await Promise.all([
     db.from("bases").select("*").eq("is_active", true).order("sort"),
     db.from("triggers").select("*").order("sort"),
@@ -68,6 +72,10 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       .select("state,bases(code),prep_role_defs(name,sort),stakeholders(name)"),
     db.from("fuel_metrics").select("metric,value,noted_on,bases(code)").order("noted_on", { ascending: false }),
     db.from("activities").select("*,bases(name)").order("created_at", { ascending: false }).limit(300),
+    db.from("map_nodes").select("id,stakeholder_id,kind,label,x,y,bases(code)"),
+    db.from("map_edges").select("id,from_node,to_node,bases(code),rel_types(name)"),
+    db.from("fuel_targets").select("metric,target,bases(code)"),
+    db.from("app_settings").select("key,value"),
   ]);
 
   const firstError =
@@ -80,7 +88,11 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     triggerEvents.error ||
     prep.error ||
     fuels.error ||
-    activities.error;
+    activities.error ||
+    mapNodes.error ||
+    mapEdges.error ||
+    fuelTargets.error ||
+    settings.error;
   if (firstError) throw firstError;
 
   // fuel: (base, metric) ごとに最新（noted_on desc の先頭）
@@ -141,5 +153,31 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       actor_name: a.actor_name,
       created_at: a.created_at,
     })),
+    mapNodes: ((mapNodes.data ?? []) as any[]).map((n) => ({
+      id: n.id,
+      base_code: one<any>(n.bases)?.code ?? "",
+      stakeholder_id: n.stakeholder_id,
+      kind: n.kind,
+      label: n.label,
+      x: Number(n.x),
+      y: Number(n.y),
+    })),
+    mapEdges: ((mapEdges.data ?? []) as any[]).map((e) => ({
+      id: e.id,
+      base_code: one<any>(e.bases)?.code ?? "",
+      from_node: e.from_node,
+      to_node: e.to_node,
+      rel_type: one<any>(e.rel_types)?.name ?? "紹介",
+    })),
+    fuelTargetOverrides: ((fuelTargets.data ?? []) as any[]).map((t) => ({
+      base_code: one<any>(t.bases)?.code ?? "",
+      metric: t.metric,
+      target: t.target,
+    })),
+    settings: Object.fromEntries(
+      ((settings.data ?? []) as any[])
+        .filter((s) => typeof s.value === "number" || /^\d+$/.test(String(s.value)))
+        .map((s) => [s.key, Number(s.value)]),
+    ),
   };
 }

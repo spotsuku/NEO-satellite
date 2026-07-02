@@ -7,6 +7,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getServiceClient } from "@/lib/supabase";
+import { generateSilhouette } from "@/lib/silhouette";
 import type { StatusName } from "@/lib/types";
 
 export interface ActionResult {
@@ -85,6 +86,184 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   return { ok: true };
 }
 
+// ---- ステークホルダー新規追加 ----
+export interface CreateStakeholderInput {
+  baseCode: string;
+  category: string;
+  name: string;
+  contactName?: string;
+  status: StatusName;
+  commitAmount?: number | null;
+  nextAction?: string;
+  actorName: string;
+}
+
+export async function createStakeholder(input: CreateStakeholderInput): Promise<ActionResult> {
+  if (!input.name?.trim()) return { ok: false, error: "名前は必須です" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+
+  const [{ data: base }, { data: cat }, { data: st }] = await Promise.all([
+    db.from("bases").select("id").eq("code", input.baseCode).single(),
+    db.from("categories").select("id").eq("name", input.category).single(),
+    db.from("statuses").select("id").eq("name", input.status).single(),
+  ]);
+  if (!base || !cat || !st) return { ok: false, error: "拠点・カテゴリ・ステータスが見つかりません" };
+
+  const { error } = await db.from("stakeholders").insert({
+    base_id: base.id,
+    category_id: cat.id,
+    status_id: st.id,
+    name: input.name.trim(),
+    contact_name: input.contactName || null,
+    commit_amount: input.commitAmount ?? null,
+    next_action: input.nextAction || null,
+    approached_on: new Date().toISOString().slice(0, 10),
+    is_sample: false,
+    updated_by: input.actorName,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ---- 燃料記録（追記型）----
+export async function recordFuelMetrics(input: {
+  baseCode: string;
+  values: Partial<Record<"interest" | "loi" | "students" | "partner_univ", number>>;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { data: base } = await db.from("bases").select("id").eq("code", input.baseCode).single();
+  if (!base) return { ok: false, error: "拠点が見つかりません" };
+  const rows = Object.entries(input.values)
+    .filter(([, v]) => Number.isFinite(v))
+    .map(([metric, value]) => ({
+      base_id: base.id,
+      metric,
+      value,
+      recorded_by: input.actorName,
+    }));
+  if (rows.length === 0) return { ok: true };
+  const { error } = await db.from("fuel_metrics").insert(rows);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ---- 関係図マップ（座標は0-1比率・last-write-wins）----
+export async function ensureMapHub(baseCode: string): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { data: base } = await db.from("bases").select("id").eq("code", baseCode).single();
+  if (!base) return { ok: false, error: "拠点が見つかりません" };
+  const { data: hub } = await db
+    .from("map_nodes")
+    .select("id")
+    .eq("base_id", base.id)
+    .eq("kind", "hub")
+    .maybeSingle();
+  if (hub) return { ok: true };
+  const { error } = await db
+    .from("map_nodes")
+    .insert({ base_id: base.id, kind: "hub", label: null, x: 0.42, y: 0.42 });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function placeMapNode(input: {
+  baseCode: string;
+  stakeholderId: string;
+  x: number;
+  y: number;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { data: base } = await db.from("bases").select("id").eq("code", input.baseCode).single();
+  if (!base) return { ok: false, error: "拠点が見つかりません" };
+  const { error } = await db.from("map_nodes").upsert(
+    {
+      base_id: base.id,
+      stakeholder_id: input.stakeholderId,
+      kind: "stakeholder",
+      x: input.x,
+      y: input.y,
+      updated_by: input.actorName,
+    },
+    { onConflict: "base_id,stakeholder_id" },
+  );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function moveMapNode(input: {
+  nodeId: string;
+  x: number;
+  y: number;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db
+    .from("map_nodes")
+    .update({ x: input.x, y: input.y, updated_by: input.actorName })
+    .eq("id", input.nodeId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function addMapEdge(input: {
+  baseCode: string;
+  fromNodeId: string;
+  toNodeId: string;
+  relType: string;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const [{ data: base }, { data: rel }] = await Promise.all([
+    db.from("bases").select("id").eq("code", input.baseCode).single(),
+    db.from("rel_types").select("id").eq("name", input.relType).single(),
+  ]);
+  if (!base || !rel) return { ok: false, error: "拠点または関係種別が見つかりません" };
+  const { error } = await db.from("map_edges").insert({
+    base_id: base.id,
+    from_node: input.fromNodeId,
+    to_node: input.toNodeId,
+    rel_type_id: rel.id,
+    created_by: input.actorName,
+  });
+  if (error && error.code !== "23505") return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function deleteMapEdge(edgeId: string): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db.from("map_edges").delete().eq("id", edgeId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function resetMapForBase(baseCode: string): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { data: base } = await db.from("bases").select("id").eq("code", baseCode).single();
+  if (!base) return { ok: false, error: "拠点が見つかりません" };
+  // map_edges は from_node の cascade で消える
+  const { error } = await db.from("map_nodes").delete().eq("base_id", base.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ---- 準備室ロールの状態更新 ----
 export async function updatePrepAssignment(input: {
   baseCode: string;
@@ -111,4 +290,126 @@ export async function updatePrepAssignment(input: {
   if (error) return { ok: false, error: error.message };
   revalidatePath("/");
   return { ok: true };
+}
+
+// =============================================================================
+// 設定（Phase 3）: トリガー文言・確度係数・燃料目標・拠点目標・拠点追加
+// =============================================================================
+
+export async function updateTriggerDef(input: {
+  code: string;
+  name: string;
+  description: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db
+    .from("triggers")
+    .update({ name: input.name, description: input.description })
+    .eq("code", input.code);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function updateStatusConfidence(input: {
+  name: string;
+  confidence: number;
+}): Promise<ActionResult> {
+  if (!(input.confidence >= 0 && input.confidence <= 1))
+    return { ok: false, error: "確度は 0〜1 で指定してください" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db
+    .from("statuses")
+    .update({ confidence: input.confidence })
+    .eq("name", input.name);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function updateFuelTargetSetting(input: {
+  key: string; // 'fuel_target_interest' 等
+  value: number;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db
+    .from("app_settings")
+    .upsert({ key: input.key, value: input.value }, { onConflict: "key" });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function updateBaseGoal(input: {
+  code: string;
+  goalAmount: number;
+}): Promise<ActionResult> {
+  if (input.goalAmount <= 0) return { ok: false, error: "目標額は正の値で指定してください" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db
+    .from("bases")
+    .update({ goal_amount: input.goalAmount })
+    .eq("code", input.code);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// 拠点追加。県名を指定するとシルエットSVGパスも自動生成（失敗しても拠点は作成）。
+export async function createBase(input: {
+  code: string;
+  name: string;
+  nameEn: string;
+  goalAmount: number;
+  prefName?: string;
+}): Promise<ActionResult & { silhouetteGenerated?: boolean }> {
+  const code = input.code.trim().toLowerCase();
+  if (!/^[a-z0-9_-]+$/.test(code))
+    return { ok: false, error: "code は英小文字・数字・ハイフンで指定してください" };
+  if (!input.name.trim() || !input.nameEn.trim())
+    return { ok: false, error: "拠点名（日本語/英語）は必須です" };
+
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+
+  let silhouette: string | null = null;
+  if (input.prefName?.trim()) {
+    try {
+      silhouette = await generateSilhouette(input.prefName.trim());
+    } catch (e) {
+      console.warn("[createBase] シルエット生成に失敗（拠点は作成します）:", e);
+    }
+  }
+
+  const { data: maxSort } = await db
+    .from("bases")
+    .select("sort")
+    .order("sort", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await db.from("bases").insert({
+    code,
+    name: input.name.trim(),
+    name_en: input.nameEn.trim().toUpperCase(),
+    goal_amount: input.goalAmount,
+    silhouette_path: silhouette,
+    sort: (maxSort?.sort ?? 100) + 1,
+  });
+  if (error) {
+    if (error.code === "23505") return { ok: false, error: `code「${code}」は既に存在します` };
+    return { ok: false, error: error.message };
+  }
+  // 準備室5ロールの割当は DB トリガー（init_prep_assignments）が自動作成
+  revalidatePath("/");
+  revalidatePath("/settings");
+  return { ok: true, silhouetteGenerated: silhouette !== null };
 }

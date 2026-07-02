@@ -2,11 +2,145 @@
 
 import { useMemo, useState } from "react";
 import type { Stakeholder, StatusDef, BaseView } from "@/lib/types";
-import { YEN, isStale } from "@/lib/domain";
-import { updateStakeholder } from "@/app/actions";
+import { isStale } from "@/lib/domain";
+import { createStakeholder, updateStakeholder } from "@/app/actions";
 import type { StatusName } from "@/lib/types";
 
 const ALL = "すべて";
+
+function AddModal({
+  bases,
+  categories,
+  statuses,
+  recorderName,
+  onClose,
+  onAdded,
+}: {
+  bases: BaseView[];
+  categories: { name: string; usesAmount: boolean }[];
+  statuses: StatusDef[];
+  recorderName: string;
+  onClose: () => void;
+  onAdded: (s: Stakeholder) => void;
+}) {
+  const [baseCode, setBaseCode] = useState(bases[0]?.code ?? "");
+  const [category, setCategory] = useState(categories[0]?.name ?? "オーナー候補");
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [status, setStatus] = useState<StatusName>("未アプローチ");
+  const [amount, setAmount] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const usesAmount = categories.find((c) => c.name === category)?.usesAmount ?? false;
+
+  async function save() {
+    setError(null);
+    if (!name.trim()) {
+      setError("名前は必須です");
+      return;
+    }
+    setBusy(true);
+    const commitAmount = usesAmount && amount !== "" ? Number(amount) : null;
+    const res = await createStakeholder({
+      baseCode,
+      category,
+      name: name.trim(),
+      contactName: contact,
+      status,
+      commitAmount,
+      nextAction,
+      actorName: recorderName,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error ?? "保存に失敗しました");
+      return;
+    }
+    const base = bases.find((b) => b.code === baseCode);
+    onAdded({
+      id: `local-${Date.now()}`,
+      baseName: base?.name ?? baseCode,
+      baseCode,
+      category,
+      usesAmount,
+      name: name.trim(),
+      contactName: contact || "—",
+      status,
+      commitAmount,
+      approachedOn: new Date().toISOString().slice(0, 10),
+      lastTouchedOn: new Date().toISOString().slice(0, 10),
+      nextAction,
+      nextActionDue: null,
+      isSample: false,
+      isStale: false,
+    });
+  }
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <div>
+            <div className="mk">NEW STAKEHOLDER</div>
+            <h3>ステークホルダーを追加</h3>
+          </div>
+          <button className="x" onClick={onClose} aria-label="閉じる">×</button>
+        </div>
+        <div className="mbd">
+          <div className="mrow2">
+            <div>
+              <label>拠点</label>
+              <select value={baseCode} onChange={(e) => setBaseCode(e.target.value)}>
+                {bases.map((b) => (
+                  <option key={b.code} value={b.code}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label>カテゴリ</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <label>名前（企業名/機関名/氏名）<span className="req">*</span></label>
+          <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
+          <label>担当者</label>
+          <input type="text" value={contact} onChange={(e) => setContact(e.target.value)} />
+          <div className="mrow2">
+            <div>
+              <label>ステータス</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value as StatusName)}>
+                {statuses.map((st) => (
+                  <option key={st.name} value={st.name}>{st.name}</option>
+                ))}
+              </select>
+            </div>
+            {usesAmount && (
+              <div>
+                <label>期待金額（万円）</label>
+                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </div>
+            )}
+          </div>
+          <label>次回アクション</label>
+          <input type="text" value={nextAction} onChange={(e) => setNextAction(e.target.value)} />
+          {error && <div className="err">{error}</div>}
+          <div className="mfoot">
+            <button className="save" onClick={save} disabled={busy}>
+              {busy ? "保存中…" : "追加する"}
+            </button>
+            <button className="cancel" onClick={onClose}>キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function StakeholderTable({
   stakeholders,
@@ -26,15 +160,17 @@ export default function StakeholderTable({
   const [fBase, setFBase] = useState(ALL);
   const [fCat, setFCat] = useState(ALL);
   const [query, setQuery] = useState("");
-  // 楽観的更新の上書き（id → 差分）
+  const [showAdd, setShowAdd] = useState(false);
+  // 楽観的更新の上書き（id → 差分）と追加行（Supabase モードでは refresh 後に本データへ）
   const [overrides, setOverrides] = useState<Record<string, Partial<Stakeholder>>>({});
+  const [added, setAdded] = useState<Stakeholder[]>([]);
 
   const baseNames = [ALL, ...bases.map((b) => b.name)];
   const catNames = [ALL, ...categories.map((c) => c.name)];
 
   const merged: Stakeholder[] = useMemo(
     () =>
-      stakeholders.map((s) => {
+      [...added, ...stakeholders].map((s) => {
         const ov = overrides[s.id];
         if (!ov) return s;
         const next = { ...s, ...ov };
@@ -50,7 +186,7 @@ export default function StakeholderTable({
         );
         return next;
       }),
-    [stakeholders, overrides, statuses, today],
+    [stakeholders, added, overrides, statuses, today],
   );
 
   const rows = merged.filter(
@@ -132,9 +268,10 @@ export default function StakeholderTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button onClick={exportCsv} style={{ marginLeft: "auto" }}>
-          CSVエクスポート
+        <button className="on" onClick={() => setShowAdd(true)} style={{ marginLeft: "auto" }}>
+          ＋ 新規追加
         </button>
+        <button onClick={exportCsv}>CSVエクスポート</button>
       </div>
 
       <table>
@@ -222,6 +359,20 @@ export default function StakeholderTable({
         「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。
         ステータス・金額・次回アクションはその場で編集できます。
       </div>
+
+      {showAdd && (
+        <AddModal
+          bases={bases}
+          categories={categories}
+          statuses={statuses}
+          recorderName={recorderName}
+          onClose={() => setShowAdd(false)}
+          onAdded={(s) => {
+            setAdded((prev) => [s, ...prev]);
+            setShowAdd(false);
+          }}
+        />
+      )}
     </>
   );
 }

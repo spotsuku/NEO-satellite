@@ -107,6 +107,23 @@ export interface RawEditorial {
   ready: string;
 }
 
+export interface RawMapNode {
+  id: string;
+  base_code: string;
+  stakeholder_id: string | null;
+  kind: "hub" | "stakeholder" | "free";
+  label: string | null;
+  x: number;
+  y: number;
+}
+export interface RawMapEdge {
+  id: string;
+  base_code: string;
+  from_node: string;
+  to_node: string;
+  rel_type: string;
+}
+
 export interface RawBundle {
   bases: RawBase[];
   triggers: RawTrigger[];
@@ -119,6 +136,10 @@ export interface RawBundle {
   fuels: RawFuel[];
   activities: RawActivity[];
   editorial?: RawEditorial[];
+  mapNodes?: RawMapNode[];
+  mapEdges?: RawMapEdge[];
+  fuelTargetOverrides?: { base_code: string; metric: string; target: number }[];
+  settings?: Record<string, number>; // app_settings の燃料目標デフォルト等
 }
 
 export function buildDashboard(
@@ -250,6 +271,18 @@ export function buildDashboard(
         };
       });
 
+      // 燃料目標: 拠点別 fuel_targets → app_settings → 既定値
+      const targetFor = (m: keyof typeof DEFAULT_FUEL_TARGETS) =>
+        raw.fuelTargetOverrides?.find((t) => t.base_code === b.code && t.metric === m)?.target ??
+        raw.settings?.[`fuel_target_${m}`] ??
+        DEFAULT_FUEL_TARGETS[m];
+      const fuelTargets = {
+        interest: targetFor("interest"),
+        loi: targetFor("loi"),
+        students: targetFor("students"),
+        partner_univ: targetFor("partner_univ"),
+      };
+
       const staleCount = stakeholders.filter((s) => s.baseCode === b.code && s.isStale).length;
 
       const proposeT3 = prepSecured === prepTotal && !achievedCodes.includes("T3");
@@ -272,7 +305,7 @@ export function buildDashboard(
         deadlineLabel: clock.deadlineLabel,
         clockPct: clock.clockPct,
         fuels,
-        fuelTargets: DEFAULT_FUEL_TARGETS,
+        fuelTargets,
         money,
         prep,
         prepSecured,
@@ -320,5 +353,21 @@ export function buildDashboard(
     company,
     stakeholders,
     activities,
+    mapNodes: (raw.mapNodes ?? []).map((n) => ({
+      id: n.id,
+      baseCode: n.base_code,
+      stakeholderId: n.stakeholder_id,
+      kind: n.kind,
+      label: n.label,
+      x: Number(n.x),
+      y: Number(n.y),
+    })),
+    mapEdges: (raw.mapEdges ?? []).map((e) => ({
+      id: e.id,
+      baseCode: e.base_code,
+      fromNodeId: e.from_node,
+      toNodeId: e.to_node,
+      relType: e.rel_type,
+    })),
   };
 }

@@ -129,6 +129,24 @@ export interface ActivityItem {
   actorName: string | null;
 }
 
+export interface MapNodeView {
+  id: string;
+  baseCode: string;
+  stakeholderId: string | null;
+  kind: "hub" | "stakeholder" | "free";
+  label: string | null; // kind<>'stakeholder' 用
+  x: number; // 0-1 比率座標
+  y: number;
+}
+
+export interface MapEdgeView {
+  id: string;
+  baseCode: string;
+  fromNodeId: string;
+  toNodeId: string;
+  relType: string;
+}
+
 export interface CompanyKpi {
   fixed: number;
   withSoft: number;
@@ -148,4 +166,6 @@ export interface DashboardData {
   company: CompanyKpi;
   stakeholders: Stakeholder[];
   activities: ActivityItem[];
+  mapNodes: MapNodeView[]; // Supabase モードのみ（モックはクライアント側でシード）
+  mapEdges: MapEdgeView[];
 }

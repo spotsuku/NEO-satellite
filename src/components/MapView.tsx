@@ -1,10 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { BaseView, Stakeholder } from "@/lib/types";
+import type { BaseView, Stakeholder, MapNodeView, MapEdgeView } from "@/lib/types";
+import {
+  addMapEdge,
+  deleteMapEdge,
+  ensureMapHub,
+  moveMapNode,
+  placeMapNode,
+  resetMapForBase,
+} from "@/app/actions";
 
+// 内部表現。座標は 0-1 比率（解像度非依存・DB保存形式と同一）
 interface MNode {
-  id: string;
+  key: string; // Supabase: map_nodes.id / モック: 合成キー
+  dbId: string | null;
+  stakeholderId: string | null;
   label: string;
   sub: string;
   status: string | null;
@@ -13,17 +24,21 @@ interface MNode {
   y: number;
 }
 interface MEdge {
-  a: string;
+  key: string;
+  dbId: string | null;
+  a: string; // MNode.key
   b: string;
   type: string;
 }
 
+const H = 600;
 const ZONES: Record<string, [number, number]> = {
   オーナー候補: [0.1, 0.1],
   教育機関: [0.68, 0.12],
   "自治体・メディア": [0.12, 0.72],
   事務局: [0.68, 0.7],
   学生事務局: [0.72, 0.4],
+  紹介役: [0.12, 0.4],
 };
 
 export default function MapView({
@@ -31,23 +46,33 @@ export default function MapView({
   stakeholders,
   relTypes,
   statuses,
+  usingSupabase,
+  mapNodes,
+  mapEdges,
+  recorderName,
 }: {
   bases: BaseView[];
   stakeholders: Stakeholder[];
   relTypes: { name: string; color: string }[];
   statuses: { name: string; color: string }[];
+  usingSupabase: boolean;
+  mapNodes: MapNodeView[];
+  mapEdges: MapEdgeView[];
+  recorderName: string;
 }) {
   const [activeBase, setActiveBase] = useState(bases[0]?.code ?? "");
   const [edgeType, setEdgeType] = useState(relTypes[0]?.name ?? "紹介");
   const [nodes, setNodes] = useState<MNode[]>([]);
   const [edges, setEdges] = useState<MEdge[]>([]);
+  const [canvasW, setCanvasW] = useState(1100);
   const [centers, setCenters] = useState<Record<string, { x: number; y: number }>>({});
   const [tmpLine, setTmpLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const cache = useRef<Record<string, { nodes: MNode[]; edges: MEdge[] }>>({});
-  const drag = useRef<{ id: string; dx: number; dy: number } | null>(null);
+  const mockCache = useRef<Record<string, { nodes: MNode[]; edges: MEdge[] }>>({});
+  const hubEnsured = useRef<Set<string>>(new Set());
+  const drag = useRef<{ key: string; dx: number; dy: number } | null>(null);
   const link = useRef<{ from: string } | null>(null);
 
   const relColor = useCallback(
@@ -58,15 +83,35 @@ export default function MapView({
     (s: string | null) => (s ? statuses.find((x) => x.name === s)?.color ?? null : null),
     [statuses],
   );
+  const baseName = bases.find((b) => b.code === activeBase)?.name ?? "";
 
-  const seed = useCallback(
+  // キャンバス幅を測定
+  useLayoutEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const update = () => setCanvasW(cv.clientWidth || 1100);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(cv);
+    return () => ro.disconnect();
+  }, []);
+
+  // モック用シード: 拠点の全ステークホルダーをゾーン配置
+  const seedMock = useCallback(
     (baseCode: string): { nodes: MNode[]; edges: MEdge[] } => {
-      const cv = canvasRef.current;
-      const W = cv?.clientWidth ?? 1100;
-      const H = 600;
-      const base = bases.find((b) => b.code === baseCode);
+      const b = bases.find((x) => x.code === baseCode);
       const nodes: MNode[] = [
-        { id: "hub", label: `NEO ${base?.name ?? ""}`, sub: "サテライト拠点", status: null, hub: true, x: W * 0.42, y: H * 0.42 },
+        {
+          key: "hub",
+          dbId: null,
+          stakeholderId: null,
+          label: `NEO ${b?.name ?? ""}`,
+          sub: "サテライト拠点",
+          status: null,
+          hub: true,
+          x: 0.42,
+          y: 0.42,
+        },
       ];
       const cnt: Record<string, number> = {};
       stakeholders
@@ -75,13 +120,15 @@ export default function MapView({
           const z = ZONES[s.category] ?? [0.45, 0.75];
           cnt[s.category] = cnt[s.category] ?? 0;
           nodes.push({
-            id: `s${i}`,
+            key: `s${i}`,
+            dbId: null,
+            stakeholderId: s.id,
             label: s.name.replace("（リスト作成中）", "リスト作成中"),
             sub: s.category + (s.isSample ? "（サンプル）" : ""),
             status: s.status,
             hub: false,
-            x: W * z[0] + (cnt[s.category] % 2) * 195,
-            y: H * z[1] + Math.floor(cnt[s.category] / 2) * 74,
+            x: z[0] + ((cnt[s.category] % 2) * 195) / 1100,
+            y: z[1] + (Math.floor(cnt[s.category] / 2) * 74) / H,
           });
           cnt[s.category]++;
         });
@@ -90,45 +137,94 @@ export default function MapView({
     [bases, stakeholders],
   );
 
-  // 拠点切替時にノード/エッジをロード（セッション内キャッシュ）
+  // Supabase: props → ローカル state 同期（ドラッグ中はスキップ）
   useEffect(() => {
     if (!activeBase) return;
-    if (!cache.current[activeBase]) cache.current[activeBase] = seed(activeBase);
-    setNodes(cache.current[activeBase].nodes.map((n) => ({ ...n })));
-    setEdges(cache.current[activeBase].edges.map((e) => ({ ...e })));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBase]);
+    if (drag.current) return;
+    if (usingSupabase) {
+      const shById = new Map(stakeholders.map((s) => [s.id, s]));
+      const ns: MNode[] = mapNodes
+        .filter((n) => n.baseCode === activeBase)
+        .map((n) => {
+          const sh = n.stakeholderId ? shById.get(n.stakeholderId) : null;
+          return {
+            key: n.id,
+            dbId: n.id,
+            stakeholderId: n.stakeholderId,
+            label: n.kind === "hub" ? `NEO ${baseName}` : (sh?.name ?? n.label ?? "?"),
+            sub: n.kind === "hub" ? "サテライト拠点" : (sh ? sh.category + (sh.isSample ? "（サンプル）" : "") : ""),
+            status: sh?.status ?? null,
+            hub: n.kind === "hub",
+            x: n.x,
+            y: n.y,
+          };
+        });
+      setNodes(ns);
+      setEdges(
+        mapEdges
+          .filter((e) => e.baseCode === activeBase)
+          .map((e) => ({ key: e.id, dbId: e.id, a: e.fromNodeId, b: e.toNodeId, type: e.relType })),
+      );
+      // ハブが無ければ作成（拠点ごとに一度だけ）
+      if (!ns.some((n) => n.hub) && !hubEnsured.current.has(activeBase)) {
+        hubEnsured.current.add(activeBase);
+        void ensureMapHub(activeBase);
+      }
+    } else {
+      if (!mockCache.current[activeBase]) mockCache.current[activeBase] = seedMock(activeBase);
+      setNodes(mockCache.current[activeBase].nodes.map((n) => ({ ...n })));
+      setEdges(mockCache.current[activeBase].edges.map((e) => ({ ...e })));
+    }
+  }, [activeBase, usingSupabase, mapNodes, mapEdges, stakeholders, baseName, seedMock]);
 
-  // 中心座標を測定（ノード位置・数が変わるたび）
+  // ノード中心（px）を測定 → エッジ描画
   useLayoutEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
     const cr = cv.getBoundingClientRect();
     const next: Record<string, { x: number; y: number }> = {};
     for (const n of nodes) {
-      const el = nodeRefs.current[n.id];
+      const el = nodeRefs.current[n.key];
       if (!el) continue;
       const r = el.getBoundingClientRect();
-      next[n.id] = { x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 };
+      next[n.key] = { x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 };
     }
     setCenters(next);
-  }, [nodes]);
+  }, [nodes, canvasW]);
 
-  function persist(nextNodes: MNode[], nextEdges: MEdge[]) {
-    cache.current[activeBase] = { nodes: nextNodes, edges: nextEdges };
+  function persistMock(nextNodes: MNode[], nextEdges: MEdge[]) {
+    if (!usingSupabase) mockCache.current[activeBase] = { nodes: nextNodes, edges: nextEdges };
   }
 
-  const onPointerDown = (e: React.PointerEvent, nodeId: string, isPort: boolean) => {
+  // 未配置プール（Supabase モードのみ意味を持つ）
+  const placedIds = new Set(nodes.map((n) => n.stakeholderId).filter(Boolean));
+  const pool = usingSupabase
+    ? stakeholders.filter((s) => s.baseCode === activeBase && !placedIds.has(s.id))
+    : [];
+
+  async function placeFromPool(s: Stakeholder) {
+    const z = ZONES[s.category] ?? [0.45, 0.75];
+    const jitter = (placedIds.size % 3) * 0.04;
+    await placeMapNode({
+      baseCode: activeBase,
+      stakeholderId: s.id,
+      x: Math.min(0.85, z[0] + jitter),
+      y: Math.min(0.85, z[1] + jitter),
+      actorName: recorderName,
+    });
+  }
+
+  const onPointerDown = (e: React.PointerEvent, nodeKey: string, isPort: boolean) => {
     e.preventDefault();
     e.stopPropagation();
     if (isPort) {
-      link.current = { from: nodeId };
+      link.current = { from: nodeKey };
       return;
     }
     const cv = canvasRef.current!;
     const cr = cv.getBoundingClientRect();
-    const n = nodes.find((x) => x.id === nodeId)!;
-    drag.current = { id: nodeId, dx: e.clientX - cr.left - n.x, dy: e.clientY - cr.top - n.y };
+    const n = nodes.find((x) => x.key === nodeKey)!;
+    drag.current = { key: nodeKey, dx: e.clientX - cr.left - n.x * cr.width, dy: e.clientY - cr.top - n.y * cr.height };
   };
 
   useEffect(() => {
@@ -140,11 +236,11 @@ export default function MapView({
         const d = drag.current;
         setNodes((prev) =>
           prev.map((n) =>
-            n.id === d.id
+            n.key === d.key
               ? {
                   ...n,
-                  x: Math.max(0, Math.min(cr.width - 140, e.clientX - cr.left - d.dx)),
-                  y: Math.max(0, Math.min(cr.height - 54, e.clientY - cr.top - d.dy)),
+                  x: Math.max(0, Math.min((cr.width - 140) / cr.width, (e.clientX - cr.left - d.dx) / cr.width)),
+                  y: Math.max(0, Math.min((cr.height - 54) / cr.height, (e.clientY - cr.top - d.dy) / cr.height)),
                 }
               : n,
           ),
@@ -157,28 +253,44 @@ export default function MapView({
     };
     const up = (e: PointerEvent) => {
       if (link.current) {
+        const from = link.current.from;
         const tgt = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(
           ".mnode",
         ) as HTMLElement | null;
-        const toId = tgt?.dataset.id;
-        if (toId && toId !== link.current.from) {
-          setEdges((prev) => {
-            const exists = prev.some(
-              (x) =>
-                (x.a === link.current!.from && x.b === toId) ||
-                (x.b === link.current!.from && x.a === toId),
-            );
-            const next = exists ? prev : [...prev, { a: link.current!.from, b: toId, type: edgeType }];
-            persist(nodes, next);
-            return next;
-          });
+        const toKey = tgt?.dataset.id;
+        if (toKey && toKey !== from) {
+          const exists = edges.some((x) => (x.a === from && x.b === toKey) || (x.b === from && x.a === toKey));
+          if (!exists) {
+            if (usingSupabase) {
+              void addMapEdge({
+                baseCode: activeBase,
+                fromNodeId: from,
+                toNodeId: toKey,
+                relType: edgeType,
+                actorName: recorderName,
+              });
+              // 楽観反映（refresh 後に本物の id へ置き換わる）
+              setEdges((prev) => [...prev, { key: `tmp-${from}-${toKey}`, dbId: null, a: from, b: toKey, type: edgeType }]);
+            } else {
+              setEdges((prev) => {
+                const next = [...prev, { key: `e${prev.length}-${from}-${toKey}`, dbId: null, a: from, b: toKey, type: edgeType }];
+                persistMock(nodes, next);
+                return next;
+              });
+            }
+          }
         }
         link.current = null;
         setTmpLine(null);
       }
       if (drag.current) {
+        const key = drag.current.key;
         drag.current = null;
-        persist(nodes, edges);
+        const n = nodes.find((x) => x.key === key);
+        if (n) {
+          if (usingSupabase && n.dbId) void moveMapNode({ nodeId: n.dbId, x: n.x, y: n.y, actorName: recorderName });
+          else persistMock(nodes, edges);
+        }
       }
     };
     window.addEventListener("pointermove", move);
@@ -187,20 +299,32 @@ export default function MapView({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
     };
-  }, [centers, nodes, edges, edgeType, activeBase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centers, nodes, edges, edgeType, activeBase, usingSupabase, recorderName]);
 
-  function delEdge(i: number) {
-    setEdges((prev) => {
-      const next = prev.filter((_, idx) => idx !== i);
-      persist(nodes, next);
-      return next;
-    });
+  function delEdge(edge: MEdge) {
+    if (usingSupabase && edge.dbId) {
+      void deleteMapEdge(edge.dbId);
+      setEdges((prev) => prev.filter((x) => x.key !== edge.key));
+    } else {
+      setEdges((prev) => {
+        const next = prev.filter((x) => x.key !== edge.key);
+        persistMock(nodes, next);
+        return next;
+      });
+    }
   }
-  function resetMap() {
-    delete cache.current[activeBase];
-    cache.current[activeBase] = seed(activeBase);
-    setNodes(cache.current[activeBase].nodes.map((n) => ({ ...n })));
-    setEdges([]);
+
+  async function resetMap() {
+    if (usingSupabase) {
+      hubEnsured.current.delete(activeBase);
+      await resetMapForBase(activeBase);
+    } else {
+      delete mockCache.current[activeBase];
+      mockCache.current[activeBase] = seedMock(activeBase);
+      setNodes(mockCache.current[activeBase].nodes.map((n) => ({ ...n })));
+      setEdges([]);
+    }
   }
 
   return (
@@ -229,11 +353,26 @@ export default function MapView({
         </button>
       </div>
       <div className="maphint">
-        カードをドラッグ＝移動 ／ カード右端の端子を別のカードへドラッグ＝線でつなぐ ／ 線をクリック＝削除（配置はこのセッション中のみ保持・Supabase永続化はPhase 2）
+        カードをドラッグ＝移動 ／ カード右端の端子を別のカードへドラッグ＝線でつなぐ ／ 線をクリック＝削除
+        {usingSupabase
+          ? " ／ 配置・接続は全員に共有されます（last-write-wins）"
+          : " ／ モックモード：配置はこのセッション中のみ保持"}
       </div>
+
+      {usingSupabase && pool.length > 0 && (
+        <div className="filters" style={{ alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: "var(--gray)" }}>未配置：</span>
+          {pool.map((s) => (
+            <button key={s.id} onClick={() => placeFromPool(s)} title="クリックでキャンバスに配置">
+              ＋ {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="canvas" ref={canvasRef} style={{ touchAction: "none" }}>
         <svg id="edges">
-          {edges.map((e, i) => {
+          {edges.map((e) => {
             const a = centers[e.a];
             const b = centers[e.b];
             if (!a || !b) return null;
@@ -241,11 +380,11 @@ export default function MapView({
             const mx = (a.x + b.x) / 2;
             const my = (a.y + b.y) / 2;
             return (
-              <g key={i}>
-                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={col} strokeWidth={2.5} onClick={() => delEdge(i)}>
+              <g key={e.key}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={col} strokeWidth={2.5} onClick={() => delEdge(e)}>
                   <title>{e.type}（クリックで削除）</title>
                 </line>
-                <text x={mx + 6} y={my - 6} onClick={() => delEdge(i)}>
+                <text x={mx + 6} y={my - 6} onClick={() => delEdge(e)}>
                   {e.type}
                 </text>
               </g>
@@ -269,14 +408,14 @@ export default function MapView({
           const sc = statusColor(n.status);
           return (
             <div
-              key={n.id}
-              data-id={n.id}
+              key={n.key}
+              data-id={n.key}
               ref={(el) => {
-                nodeRefs.current[n.id] = el;
+                nodeRefs.current[n.key] = el;
               }}
               className={`mnode${n.hub ? " mhub" : ""}`}
-              style={{ left: n.x, top: n.y }}
-              onPointerDown={(e) => onPointerDown(e, n.id, false)}
+              style={{ left: n.x * canvasW, top: n.y * H }}
+              onPointerDown={(e) => onPointerDown(e, n.key, false)}
             >
               <b>{n.label}</b>
               <small>
@@ -287,7 +426,7 @@ export default function MapView({
               <span
                 className="mport"
                 title="ドラッグして別のカードへ"
-                onPointerDown={(e) => onPointerDown(e, n.id, true)}
+                onPointerDown={(e) => onPointerDown(e, n.key, true)}
               />
             </div>
           );
