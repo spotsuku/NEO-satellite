@@ -166,6 +166,31 @@ tr.row:hover { background: var(--hover); }
 .inline-input { font-family: 'Noto Sans JP', sans-serif; font-size: 12px; border: 1px solid var(--line); padding: 4px 6px; background: var(--paper); color: var(--ink); width: 100%; }
 .inline-input:focus { outline: none; border-color: var(--ink); }
 
+/* ===== whiteboard map ===== */
+.maptools { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+.mtype { font-size: 11px; color: var(--gray); }
+.mtype button { background: none; border: 1px solid var(--line); color: var(--gray); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; padding: 4px 10px; cursor: pointer; margin-left: 6px; }
+.mtype button.on { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.mreset { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--gray); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; padding: 5px 12px; cursor: pointer; }
+.mreset:hover { border-color: var(--ink); color: var(--ink); }
+.maphint { font-size: 11px; color: var(--gray); margin-bottom: 12px; }
+.canvas { position: relative; height: 600px; border: 1px solid var(--ink); overflow: hidden; touch-action: none;
+  background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 22px 22px; }
+#edges { position: absolute; inset: 0; width: 100%; height: 100%; }
+#edges line { cursor: pointer; }
+#edges text { font-size: 10px; font-weight: 700; font-family: 'Noto Sans JP', sans-serif; fill: var(--gray); cursor: pointer; }
+.mnode { position: absolute; background: var(--paper); border: 1.5px solid var(--ink); padding: 8px 26px 8px 12px; min-width: 120px; max-width: 190px; cursor: grab; user-select: none; line-height: 1.5; }
+.mnode:active { cursor: grabbing; }
+.mnode b { display: block; font-size: 12.5px; }
+.mnode small { display: block; font-size: 9.5px; color: var(--gray); }
+.mnode .msd { position: absolute; top: 8px; right: 24px; width: 8px; height: 8px; border-radius: 50%; }
+.mnode .mport { position: absolute; top: 50%; right: -7px; transform: translateY(-50%); width: 13px; height: 13px; border-radius: 50%; background: var(--ink); border: 2px solid var(--paper); cursor: crosshair; }
+.mnode .mport:hover { background: var(--pink); }
+.mnode.mhub { background: var(--ink); color: #fff; border-color: var(--ink); cursor: grab; padding: 12px 26px 12px 16px; }
+.mnode.mhub b { font-size: 14px; }
+.mnode.mhub small { color: var(--lgray); }
+.mnode.linktarget { border-color: var(--pink); border-width: 2.5px; }
+
 /* ===== activity feed ===== */
 .feed { list-style: none; max-width: 760px; }
 .feed li { display: flex; gap: 18px; padding: 16px 4px; border-bottom: 1px solid var(--line); }
@@ -207,6 +232,9 @@ tr.row:hover { background: var(--hover); }
 .step .sid { font-family: 'Montserrat', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .18em; color: var(--gray); }
 .step .snm { font-size: 11.5px; font-weight: 700; line-height: 1.4; }
 .step .sdc { font-size: 9.5px; color: var(--gray); line-height: 1.45; margin-top: 1px; }
+.step { cursor: pointer; transition: background .12s; }
+.step:hover { background: var(--hover); }
+.step .shint { font-size: 8.5px; color: var(--lgray); letter-spacing: .06em; }
 .step::after { content: "→"; position: absolute; right: -6px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--gray); background: var(--paper); z-index: 1; padding: 0 1px; }
 .step:last-child::after { content: ""; }
 @media (max-width: 1100px) { .steps { flex-wrap: wrap; } .step { min-width: 25%; } }

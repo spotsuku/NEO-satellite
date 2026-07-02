@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/types";
 import { applyTriggerEvent } from "@/lib/optimistic";
 import { getBrowserClient } from "@/lib/supabaseBrowser";
-import { Steps, Legend } from "./StepsLegend";
+import { Steps, Legend, TriggerInfoModal } from "./StepsLegend";
+import type { Trigger } from "@/lib/types";
 import Kpis from "./Kpis";
 import BoardCards from "./BoardCards";
 import BaseDetail from "./BaseDetail";
@@ -27,12 +28,13 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const [tab, setTab] = useState<Tab>("board");
   const [selected, setSelected] = useState<string | null>(null);
   const [cele, setCele] = useState<CelebrationState | null>(null);
-  const [recordModal, setRecordModal] = useState<{ baseCode: string; triggerCode: string; triggerName: string } | null>(null);
+  const [recordModal, setRecordModal] = useState<{ baseCode: string; initialCode: string } | null>(null);
+  const [infoTrigger, setInfoTrigger] = useState<Trigger | null>(null);
 
   const [name, setName] = useState<string>("");
   const [showName, setShowName] = useState(false);
   const [nameReady, setNameReady] = useState(false);
-  const pendingRecord = useRef<{ baseCode: string; triggerCode: string; triggerName: string } | null>(null);
+  const pendingRecord = useRef<{ baseCode: string; initialCode: string } | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const recentLocal = useRef<Set<string>>(new Set());
 
@@ -60,13 +62,22 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 40);
   }, []);
 
-  function openRecord(baseCode: string, triggerCode: string, triggerName: string) {
+  function openRecord(baseCode: string, initialCode: string) {
     if (!name) {
-      pendingRecord.current = { baseCode, triggerCode, triggerName };
+      pendingRecord.current = { baseCode, initialCode };
       setShowName(true);
       return;
     }
-    setRecordModal({ baseCode, triggerCode, triggerName });
+    setRecordModal({ baseCode, initialCode });
+  }
+
+  // カードの T1〜T8 ドットクリック: 未成立→そのトリガーの成立記録 / 成立済み→詳細（ログ）
+  function onDotClick(baseCode: string, trigger: Trigger) {
+    const base = data.bases.find((b) => b.code === baseCode);
+    selectBase(baseCode);
+    if (base && !base.achievedCodes.includes(trigger.code)) {
+      openRecord(baseCode, trigger.code);
+    }
   }
 
   function onRecorded(p: RecordPayload) {
@@ -176,9 +187,9 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
 
       <main>
         <section className={`view ${tab === "board" ? "on" : ""}`}>
-          <Steps triggers={data.triggers} />
+          <Steps triggers={data.triggers} onInfo={setInfoTrigger} />
           <Legend />
-          <BoardCards bases={data.bases} triggers={data.triggers} onSelectBase={selectBase} />
+          <BoardCards bases={data.bases} triggers={data.triggers} onSelectBase={selectBase} onDotClick={onDotClick} />
           <div ref={detailRef}>
             {selectedBase && (
               <BaseDetail
@@ -187,7 +198,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
                 stakeholders={data.stakeholders}
                 statuses={data.statuses}
                 recorderName={name || "匿名"}
-                onRecord={(code, tname) => openRecord(selectedBase.code, code, tname)}
+                onRecord={(code) => openRecord(selectedBase.code, code)}
                 onClose={() => setSelected(null)}
               />
             )}
@@ -236,14 +247,17 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
         <TriggerRecordModal
           baseCode={recordModal.baseCode}
           baseName={data.bases.find((b) => b.code === recordModal.baseCode)?.name ?? ""}
-          triggerCode={recordModal.triggerCode}
-          triggerName={recordModal.triggerName}
+          triggers={data.triggers}
+          achievedCodes={data.bases.find((b) => b.code === recordModal.baseCode)?.achievedCodes ?? []}
+          initialCode={recordModal.initialCode}
           defaultDate={data.today}
           recordedBy={name || "匿名"}
           onCancel={() => setRecordModal(null)}
           onRecorded={onRecorded}
         />
       )}
+
+      {infoTrigger && <TriggerInfoModal trigger={infoTrigger} onClose={() => setInfoTrigger(null)} />}
 
       {nameReady && showName && (
         <NameModal

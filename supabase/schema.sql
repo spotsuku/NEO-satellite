@@ -49,10 +49,13 @@ create table if not exists triggers (
   code text unique not null,                   -- 'T1'〜'T8'
   name text not null,                          -- '地域の紹介役合意'
   description text,                            -- 凡例帯の一言（誰がどう変わるか）
+  criteria text,                               -- 成立条件（何が起きたら成立と記録するか）
   is_clock_start boolean not null default false, -- T1: 成立で90日時計起動
   auto_rule text,                              -- 'prep_complete' | 'goal_reached' | null
   sort integer not null
 );
+-- 既存DBへの追補（冪等）
+alter table triggers add column if not exists criteria text;
 
 create table if not exists statuses (
   id uuid primary key default gen_random_uuid(),

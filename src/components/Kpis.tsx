@@ -35,7 +35,6 @@ export default function Kpis({
       </div>
 
       {bases.map((b) => {
-        const nowT = triggers[Math.min(b.done, triggers.length - 1)];
         const pct = Math.round((b.done / b.triggersTotal) * 100);
         return (
           <div
@@ -55,7 +54,7 @@ export default function Kpis({
             <div className="sub">
               成立 <b>{b.done}/{b.triggersTotal}</b> ｜ 加盟金 <b>{YEN(b.money.fixed)}</b>万
               <br />
-              次: {nowT.code} {TRIGGER_SHORT[nowT.code] ?? nowT.name}
+              次: {b.next.code} {TRIGGER_SHORT[b.next.code] ?? b.next.name}
               {b.daysLeft !== null && (
                 <>
                   {" ｜ "}

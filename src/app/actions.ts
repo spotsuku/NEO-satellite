@@ -300,13 +300,13 @@ export async function updateTriggerDef(input: {
   code: string;
   name: string;
   description: string;
+  criteria?: string;
 }): Promise<ActionResult> {
   const db = getServiceClient();
   if (!db) return { ok: true, demo: true };
-  const { error } = await db
-    .from("triggers")
-    .update({ name: input.name, description: input.description })
-    .eq("code", input.code);
+  const patch: Record<string, string> = { name: input.name, description: input.description };
+  if (input.criteria !== undefined) patch.criteria = input.criteria;
+  const { error } = await db.from("triggers").update(patch).eq("code", input.code);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/");
   revalidatePath("/settings");

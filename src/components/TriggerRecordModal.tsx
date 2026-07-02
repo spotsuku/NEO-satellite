@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { recordTriggerEvent } from "@/app/actions";
+import type { Trigger } from "@/lib/types";
 
 export interface RecordPayload {
   baseCode: string;
@@ -15,8 +16,9 @@ export interface RecordPayload {
 export default function TriggerRecordModal({
   baseCode,
   baseName,
-  triggerCode,
-  triggerName,
+  triggers,
+  achievedCodes,
+  initialCode,
   defaultDate,
   recordedBy,
   onCancel,
@@ -24,18 +26,25 @@ export default function TriggerRecordModal({
 }: {
   baseCode: string;
   baseName: string;
-  triggerCode: string;
-  triggerName: string;
+  triggers: Trigger[];
+  achievedCodes: string[];
+  initialCode: string;
   defaultDate: string;
   recordedBy: string;
   onCancel: () => void;
   onRecorded: (p: RecordPayload) => void;
 }) {
+  const selectable = triggers.filter((t) => !achievedCodes.includes(t.code));
+  const [code, setCode] = useState(
+    selectable.some((t) => t.code === initialCode) ? initialCode : (selectable[0]?.code ?? initialCode),
+  );
   const [achievedOn, setAchievedOn] = useState(defaultDate);
   const [participants, setParticipants] = useState("");
   const [evidence, setEvidence] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selected = triggers.find((t) => t.code === code);
 
   async function submit() {
     setError(null);
@@ -44,7 +53,14 @@ export default function TriggerRecordModal({
       return;
     }
     setBusy(true);
-    const payload: RecordPayload = { baseCode, triggerCode, achievedOn, participants, evidence, recordedBy };
+    const payload: RecordPayload = {
+      baseCode,
+      triggerCode: code,
+      achievedOn,
+      participants,
+      evidence,
+      recordedBy,
+    };
     const res = await recordTriggerEvent(payload);
     setBusy(false);
     if (!res.ok) {
@@ -60,15 +76,41 @@ export default function TriggerRecordModal({
         <div className="mhd">
           <div>
             <div className="mk">RECORD TRIGGER</div>
-            <h3>
-              {baseName} — {triggerCode} {triggerName}
-            </h3>
+            <h3>{baseName} — イベント成立を記録</h3>
           </div>
           <button className="x" onClick={onCancel} aria-label="閉じる">
             ×
           </button>
         </div>
         <div className="mbd">
+          <label>
+            トリガー<span className="req">*</span>
+          </label>
+          <select value={code} onChange={(e) => setCode(e.target.value)}>
+            {selectable.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.code} {t.name}
+              </option>
+            ))}
+          </select>
+
+          {selected && (
+            <div
+              style={{
+                border: "1px solid var(--line)",
+                borderLeft: "3px solid var(--ink)",
+                padding: "10px 12px",
+                margin: "10px 0 2px",
+                fontSize: 11.5,
+                lineHeight: 1.7,
+                color: "var(--gray)",
+              }}
+            >
+              <b style={{ color: "var(--ink)" }}>成立条件：</b>
+              {selected.criteria}
+            </div>
+          )}
+
           <label>
             成立日<span className="req">*</span>
           </label>
@@ -97,7 +139,7 @@ export default function TriggerRecordModal({
           {error && <div className="err">{error}</div>}
 
           <div className="mfoot">
-            <button className="save" onClick={submit} disabled={busy}>
+            <button className="save" onClick={submit} disabled={busy || selectable.length === 0}>
               {busy ? "保存中…" : "成立を記録して祝う"}
             </button>
             <button className="cancel" onClick={onCancel}>

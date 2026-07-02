@@ -42,7 +42,12 @@ export default function SettingsClient({ data }: { data: DashboardData }) {
 
   // ---- 各セクションのローカル状態 ----
   const [trg, setTrg] = useState(
-    data.triggers.map((t) => ({ code: t.code, name: t.name, description: t.description })),
+    data.triggers.map((t) => ({
+      code: t.code,
+      name: t.name,
+      description: t.description,
+      criteria: t.criteria,
+    })),
   );
   const [conf, setConf] = useState(
     data.statuses.map((s) => ({ name: s.name, confidence: s.confidence })),
@@ -100,8 +105,9 @@ export default function SettingsClient({ data }: { data: DashboardData }) {
           <thead>
             <tr>
               <th style={{ width: 60 }}>CODE</th>
-              <th style={{ width: "30%" }}>名称</th>
-              <th>説明（凡例帯の一言）</th>
+              <th style={{ width: "22%" }}>名称</th>
+              <th style={{ width: "28%" }}>説明（凡例帯の一言）</th>
+              <th>成立条件</th>
               <th style={{ width: 90 }} />
             </tr>
           </thead>
@@ -121,6 +127,15 @@ export default function SettingsClient({ data }: { data: DashboardData }) {
                     className="inline-input"
                     value={t.description}
                     onChange={(e) => setTrg((p) => p.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))}
+                  />
+                </td>
+                <td>
+                  <textarea
+                    className="inline-input"
+                    rows={2}
+                    style={{ resize: "vertical", lineHeight: 1.5 }}
+                    value={t.criteria}
+                    onChange={(e) => setTrg((p) => p.map((x, j) => (j === i ? { ...x, criteria: e.target.value } : x)))}
                   />
                 </td>
                 <td>

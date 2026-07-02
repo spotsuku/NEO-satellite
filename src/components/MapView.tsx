@@ -249,6 +249,9 @@ export default function MapView({
       if (link.current) {
         const c = centers[link.current.from];
         if (c) setTmpLine({ x1: c.x, y1: c.y, x2: e.clientX - cr.left, y2: e.clientY - cr.top });
+        cv.querySelectorAll(".mnode").forEach((n) => n.classList.remove("linktarget"));
+        const tgt = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(".mnode");
+        if (tgt && (tgt as HTMLElement).dataset.id !== link.current.from) tgt.classList.add("linktarget");
       }
     };
     const up = (e: PointerEvent) => {
@@ -280,6 +283,7 @@ export default function MapView({
             }
           }
         }
+        canvasRef.current?.querySelectorAll(".mnode").forEach((n) => n.classList.remove("linktarget"));
         link.current = null;
         setTmpLine(null);
       }

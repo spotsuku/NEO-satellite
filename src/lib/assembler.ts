@@ -21,6 +21,7 @@ import {
   isStale,
   mmdd,
   TRIGGER_SHORT,
+  TRIGGER_CRITERIA,
   DEFAULT_FUEL_TARGETS,
 } from "./domain";
 import { PREFECTURE_PATHS } from "./prefectures";
@@ -41,6 +42,7 @@ export interface RawTrigger {
   code: string;
   name: string;
   description: string | null;
+  criteria?: string | null;
   is_clock_start: boolean;
   auto_rule: "prep_complete" | "goal_reached" | null;
   sort: number;
@@ -154,6 +156,7 @@ export function buildDashboard(
       name: t.name,
       short: TRIGGER_SHORT[t.code] ?? t.name,
       description: t.description ?? "",
+      criteria: t.criteria ?? TRIGGER_CRITERIA[t.code] ?? "",
       isClockStart: t.is_clock_start,
       autoRule: t.auto_rule,
       sort: t.sort,
@@ -249,8 +252,9 @@ export function buildDashboard(
       const prepTotal = prepRows.length || 5;
       const prepSecured = prep.filter((p) => p.state === "確保").length;
 
-      // NEXT
-      const nextT = triggers[Math.min(done, triggersTotal - 1)];
+      // NEXT = 最初の未成立トリガー（飛び石で成立した場合も正しく指す）
+      const nextT =
+        triggers.find((t) => !achievedCodes.includes(t.code)) ?? triggers[triggersTotal - 1];
       const ed = editorialByBase.get(b.code);
       const next = {
         code: nextT.code,

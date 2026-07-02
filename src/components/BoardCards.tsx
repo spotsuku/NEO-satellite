@@ -21,18 +21,37 @@ function PrepDots({ base }: { base: BaseView }) {
   );
 }
 
-function Chain({ base, triggers }: { base: BaseView; triggers: Trigger[] }) {
+function Chain({
+  base,
+  triggers,
+  onDotClick,
+}: {
+  base: BaseView;
+  triggers: Trigger[];
+  onDotClick: (baseCode: string, trigger: Trigger) => void;
+}) {
+  const doneSet = new Set(base.achievedCodes);
   return (
     <div className="chain">
-      {triggers.map((t, i) => (
-        <span key={t.code} style={{ display: "contents" }}>
-          {i > 0 && <span className={`cl ${i < base.done ? "done" : ""}`} />}
-          <span
-            className={`cd ${i < base.done ? "done" : i === base.done ? "now" : ""}`}
-            title={`${t.code} ${t.name}`}
-          />
-        </span>
-      ))}
+      {triggers.map((t, i) => {
+        const done = doneSet.has(t.code);
+        const now = t.code === base.next.code;
+        const prevDone = i > 0 && doneSet.has(triggers[i - 1].code);
+        return (
+          <span key={t.code} style={{ display: "contents" }}>
+            {i > 0 && <span className={`cl ${prevDone && done ? "done" : ""}`} />}
+            <span
+              className={`cd ${done ? "done" : now ? "now" : ""}`}
+              style={{ cursor: "pointer" }}
+              title={`${t.code} ${t.name}${done ? "（成立済み）" : `\n成立条件: ${t.criteria}\nクリックで成立を記録`}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDotClick(base.code, t);
+              }}
+            />
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -41,16 +60,17 @@ export default function BoardCards({
   bases,
   triggers,
   onSelectBase,
+  onDotClick,
 }: {
   bases: BaseView[];
   triggers: Trigger[];
   onSelectBase: (code: string) => void;
+  onDotClick: (baseCode: string, trigger: Trigger) => void;
 }) {
   return (
     <div className="cards" id="board">
       {bases.map((b) => {
         const prog = b.done / b.triggersTotal;
-        const nowT = triggers[Math.min(b.done, triggers.length - 1)];
         const warn = b.daysLeft !== null && b.daysLeft <= 30;
         return (
           <div className="card" key={b.code} onClick={() => onSelectBase(b.code)}>
@@ -66,7 +86,7 @@ export default function BoardCards({
             </div>
 
             <Silhouette id={b.code} path={b.silhouettePath} progress={prog} />
-            <Chain base={b} triggers={triggers} />
+            <Chain base={b} triggers={triggers} onDotClick={onDotClick} />
 
             <div className="mrow">
               <span>加盟金</span>
@@ -141,7 +161,7 @@ export default function BoardCards({
 
             <span className="nx">
               <b>NEXT</b>
-              {nowT.code} {nowT.name}
+              {b.next.code} {b.next.name}
             </span>
           </div>
         );

@@ -85,7 +85,7 @@ export default function BaseDetail({
   stakeholders: Stakeholder[];
   statuses: StatusDef[];
   recorderName: string;
-  onRecord: (triggerCode: string, triggerName: string) => void;
+  onRecord: (triggerCode: string) => void;
   onClose: () => void;
 }) {
   // 準備室ロールの楽観的上書き（roleName → state）
@@ -130,7 +130,7 @@ export default function BaseDetail({
             <div className="pt">T3 準備室発足の条件を満たしました</div>
             <div className="ps">5ロールすべて「確保」。成立にしますか？（成立日・証拠の入力が必要です）</div>
           </div>
-          <button className="rec-btn solid" onClick={() => onRecord("T3", "準備室発足")}>
+          <button className="rec-btn solid" onClick={() => onRecord("T3")}>
             T3成立を記録
           </button>
         </div>
@@ -142,7 +142,7 @@ export default function BaseDetail({
             <div className="pt">T7 加盟金{YEN(base.goalAmount)}万円を達成しました</div>
             <div className="ps">確定合計が目標に到達。成立にしますか？（成立日・証拠の入力が必要です）</div>
           </div>
-          <button className="rec-btn solid" onClick={() => onRecord("T7", "加盟金3000万円達成")}>
+          <button className="rec-btn solid" onClick={() => onRecord("T7")}>
             T7成立を記録
           </button>
         </div>
@@ -254,9 +254,15 @@ export default function BaseDetail({
                 </>
               )}
             </div>
+            {nextT?.criteria && (
+              <div className="nd" style={{ marginTop: 8, borderTop: "1px solid #333", paddingTop: 8 }}>
+                <span style={{ color: "var(--yellow)", fontWeight: 700 }}>成立条件：</span>
+                {nextT.criteria}
+              </div>
+            )}
           </div>
 
-          <button className="rec-btn" onClick={() => onRecord(base.next.code, base.next.name)}>
+          <button className="rec-btn" onClick={() => onRecord(base.next.code)}>
             ▶ イベント成立を記録
           </button>{" "}
           <button className="rec-btn" style={{ borderColor: "var(--cyan)", color: "var(--cyan)" }} onClick={() => setShowFuel(true)}>
