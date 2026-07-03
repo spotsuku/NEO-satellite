@@ -281,6 +281,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
         <TriggerRecordModal
           baseCode={recordModal.baseCode}
           baseName={data.bases.find((b) => b.code === recordModal.baseCode)?.name ?? ""}
+          base={data.bases.find((b) => b.code === recordModal.baseCode)}
           triggers={data.triggers}
           achievedCodes={data.bases.find((b) => b.code === recordModal.baseCode)?.achievedCodes ?? []}
           initialCode={recordModal.initialCode}

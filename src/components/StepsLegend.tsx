@@ -1,6 +1,7 @@
 "use client";
 
 import type { Trigger } from "@/lib/types";
+import TriggerChecklist from "./TriggerChecklist";
 
 export function Steps({ triggers, onInfo }: { triggers: Trigger[]; onInfo: (t: Trigger) => void }) {
   return (
@@ -59,11 +60,10 @@ export function TriggerInfoModal({ trigger, onClose }: { trigger: Trigger; onClo
         </div>
         <div className="mbd">
           <label>成立の意味</label>
-          <p style={{ fontSize: 13, lineHeight: 1.8 }}>{trigger.description}</p>
-          <label>成立条件（この状態が観測できたら成立と記録）</label>
-          <p style={{ fontSize: 13, lineHeight: 1.8 }}>{trigger.criteria}</p>
+          <p style={{ fontSize: 13, lineHeight: 1.8, marginBottom: 14 }}>{trigger.description}</p>
+          <TriggerChecklist trigger={trigger} />
           <p style={{ fontSize: 11, color: "var(--gray)", marginTop: 14, lineHeight: 1.7 }}>
-            イベントは「開催した」ではなく成立条件を満たした時点で成立と記録します。記録時には成立日と
+            すべて満たしたら成立として記録します（「開催した」ではなく条件を満たした時点が成立）。記録時には成立日と
             <b>成立の証拠</b>（相手から出た次のアクション提案などの質的メモ）が必須です。
           </p>
         </div>

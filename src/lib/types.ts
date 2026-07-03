@@ -20,6 +20,7 @@ export interface Trigger {
   short: string; // 凡例帯の短縮名（モック互換）
   description: string;
   criteria: string; // 成立条件（何が観測できたら成立と記録するか）
+  checklist: string[]; // 成立条件チェックリスト（短い達成項目）
   isClockStart: boolean;
   autoRule: "prep_complete" | "goal_reached" | null;
   sort: number;

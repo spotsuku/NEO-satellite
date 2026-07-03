@@ -38,6 +38,18 @@ on conflict (code) do update
   set name = excluded.name, description = excluded.description, criteria = excluded.criteria,
       is_clock_start = excluded.is_clock_start, auto_rule = excluded.auto_rule, sort = excluded.sort;
 
+-- 成立条件チェックリスト（「何をクリアすればいいか」の短い達成項目）
+update triggers set checklist = c.list from (values
+  ('T1', '["地域の顔役（キーマン）とつながる","「事務局目線」での紹介協力に合意してもらう","相手から具体的な紹介先の名前が出る"]'::jsonb),
+  ('T2', '["顔役の紹介で関係者を集めて戦略会議（飲み会）を開く","参加者側から次のアクション提案が出る","宿題の持ち帰りが出る（自分ごと化のサイン）"]'::jsonb),
+  ('T3', '["現地紹介者を確保","オーナー企業候補を確保","学生リーダー候補を確保","大学・高校関係者を確保","自治体関係者を確保"]'::jsonb),
+  ('T4', '["現地説明会を開催する","参加者から個別相談・追加の紹介・参画意向が出る"]'::jsonb),
+  ('T5', '["オーナー候補の経営トップとの会談を設定する","トップから出資検討の意思が表明される（金額感・社内検討の約束）"]'::jsonb),
+  ('T6', '["1社目のオーナー企業と加盟条件に合意する","調印式を実施する"]'::jsonb),
+  ('T7', '["ステータス「確定」の加盟金合計が拠点目標に到達する","T1成立から90日以内にクリアする"]'::jsonb),
+  ('T8', '["キックオフ（開校）イベントを実施する","拠点の本番運営が始まる"]'::jsonb)
+) as c(code, list) where triggers.code = c.code;
+
 -- ---------- ステータス（7値）----------
 -- confidence: 商談中0.3・検討中0.5・内諾0.8・確定1.0（app_settings ではなくここが正）
 insert into statuses (name, confidence, is_active_deal, is_terminal, color, sort) values

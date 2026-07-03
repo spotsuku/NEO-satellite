@@ -56,6 +56,7 @@ create table if not exists triggers (
 );
 -- 既存DBへの追補（冪等）
 alter table triggers add column if not exists criteria text;
+alter table triggers add column if not exists checklist jsonb; -- 成立条件チェックリスト（短い達成項目の配列）
 
 create table if not exists statuses (
   id uuid primary key default gen_random_uuid(),

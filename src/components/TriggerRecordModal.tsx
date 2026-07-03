@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { recordTriggerEvent } from "@/app/actions";
-import type { Trigger } from "@/lib/types";
+import type { Trigger, BaseView } from "@/lib/types";
+import TriggerChecklist from "./TriggerChecklist";
 
 export interface RecordPayload {
   baseCode: string;
@@ -16,6 +17,7 @@ export interface RecordPayload {
 export default function TriggerRecordModal({
   baseCode,
   baseName,
+  base,
   triggers,
   achievedCodes,
   initialCode,
@@ -27,6 +29,7 @@ export default function TriggerRecordModal({
 }: {
   baseCode: string;
   baseName: string;
+  base?: BaseView | null;
   triggers: Trigger[];
   achievedCodes: string[];
   initialCode: string;
@@ -45,6 +48,8 @@ export default function TriggerRecordModal({
   const [evidence, setEvidence] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 手動チェック（記録の目安。保存はしない）: triggerCode → checked[]
+  const [checks, setChecks] = useState<Record<string, boolean[]>>({});
 
   const selected = triggers.find((t) => t.code === code);
 
@@ -103,13 +108,20 @@ export default function TriggerRecordModal({
                 borderLeft: "3px solid var(--ink)",
                 padding: "10px 12px",
                 margin: "10px 0 2px",
-                fontSize: 11.5,
-                lineHeight: 1.7,
-                color: "var(--gray)",
               }}
             >
-              <b style={{ color: "var(--ink)" }}>成立条件：</b>
-              {selected.criteria}
+              <TriggerChecklist
+                trigger={selected}
+                base={base}
+                checked={checks[selected.code] ?? []}
+                onToggle={(i) =>
+                  setChecks((p) => {
+                    const arr = [...(p[selected.code] ?? [])];
+                    arr[i] = !arr[i];
+                    return { ...p, [selected.code]: arr };
+                  })
+                }
+              />
             </div>
           )}
 

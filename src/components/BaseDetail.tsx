@@ -5,6 +5,7 @@ import type { BaseView, Trigger, Stakeholder, StatusDef, PrepState } from "@/lib
 import { YEN, pct } from "@/lib/domain";
 import { updatePrepAssignment, recordFuelMetrics } from "@/app/actions";
 import MoneyBar from "./MoneyBar";
+import TriggerChecklist from "./TriggerChecklist";
 
 const PREP_CYCLE: Record<PrepState, PrepState> = { 未: "検討中", 検討中: "確保", 確保: "未" };
 
@@ -258,10 +259,9 @@ export default function BaseDetail({
                 </>
               )}
             </div>
-            {nextT?.criteria && (
-              <div className="nd" style={{ marginTop: 8, borderTop: "1px solid #333", paddingTop: 8 }}>
-                <span style={{ color: "var(--yellow)", fontWeight: 700 }}>成立条件：</span>
-                {nextT.criteria}
+            {nextT && (
+              <div style={{ marginTop: 10, borderTop: "1px solid #333", paddingTop: 10 }}>
+                <TriggerChecklist trigger={nextT} base={base} dark />
               </div>
             )}
           </div>

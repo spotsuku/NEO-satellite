@@ -22,6 +22,7 @@ import {
   mmdd,
   TRIGGER_SHORT,
   TRIGGER_CRITERIA,
+  TRIGGER_CHECKLIST,
   DEFAULT_FUEL_TARGETS,
 } from "./domain";
 import { PREFECTURE_PATHS } from "./prefectures";
@@ -43,6 +44,7 @@ export interface RawTrigger {
   name: string;
   description: string | null;
   criteria?: string | null;
+  checklist?: string[] | null;
   is_clock_start: boolean;
   auto_rule: "prep_complete" | "goal_reached" | null;
   sort: number;
@@ -157,6 +159,7 @@ export function buildDashboard(
       short: TRIGGER_SHORT[t.code] ?? t.name,
       description: t.description ?? "",
       criteria: t.criteria ?? TRIGGER_CRITERIA[t.code] ?? "",
+      checklist: t.checklist ?? TRIGGER_CHECKLIST[t.code] ?? [],
       isClockStart: t.is_clock_start,
       autoRule: t.auto_rule,
       sort: t.sort,
