@@ -55,6 +55,42 @@ export async function recordTriggerEvent(input: RecordTriggerInput): Promise<Act
   return { ok: true };
 }
 
+// ---- トリガーイベント成立の取り消し（手動で状態を戻す）----
+export async function deleteTriggerEvent(input: {
+  baseCode: string;
+  triggerCode: string;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+
+  const [{ data: base }, { data: trg }] = await Promise.all([
+    db.from("bases").select("id,name").eq("code", input.baseCode).single(),
+    db.from("triggers").select("id,name").eq("code", input.triggerCode).single(),
+  ]);
+  if (!base || !trg) return { ok: false, error: "拠点またはトリガーが見つかりません" };
+
+  const { error, count } = await db
+    .from("trigger_events")
+    .delete({ count: "exact" })
+    .eq("base_id", base.id)
+    .eq("trigger_id", trg.id);
+  if (error) return { ok: false, error: error.message };
+  if (!count) return { ok: false, error: "成立記録が見つかりません" };
+
+  // 監査: 取り消しもアクティビティに残す（is_big=false）
+  await db.from("activities").insert({
+    base_id: base.id,
+    kind: "system",
+    title: `${input.triggerCode} ${trg.name} の成立を取り消し`,
+    body: null,
+    is_big: false,
+    actor_name: input.actorName,
+  });
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ---- ステークホルダーのインライン更新（ステータス / 次回アクション / 金額）----
 export interface UpdateStakeholderInput {
   id: string;

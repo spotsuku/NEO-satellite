@@ -21,6 +21,7 @@ export default function TriggerRecordModal({
   initialCode,
   defaultDate,
   recordedBy,
+  usingSupabase,
   onCancel,
   onRecorded,
 }: {
@@ -31,6 +32,7 @@ export default function TriggerRecordModal({
   initialCode: string;
   defaultDate: string;
   recordedBy: string;
+  usingSupabase: boolean;
   onCancel: () => void;
   onRecorded: (p: RecordPayload) => void;
 }) {
@@ -137,6 +139,11 @@ export default function TriggerRecordModal({
           <input type="text" value={recordedBy} readOnly style={{ color: "var(--gray)" }} />
 
           {error && <div className="err">{error}</div>}
+          {!usingSupabase && (
+            <p style={{ fontSize: 10.5, color: "var(--red)", marginTop: 10 }}>
+              ⚠ モックモード（Supabase未設定）: 記録は画面上のみで、再読み込みで消えます。
+            </p>
+          )}
 
           <div className="mfoot">
             <button className="save" onClick={submit} disabled={busy || selectable.length === 0}>

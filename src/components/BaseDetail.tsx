@@ -77,7 +77,9 @@ export default function BaseDetail({
   stakeholders,
   statuses,
   recorderName,
+  usingSupabase,
   onRecord,
+  onUnrecord,
   onClose,
 }: {
   base: BaseView;
@@ -85,7 +87,9 @@ export default function BaseDetail({
   stakeholders: Stakeholder[];
   statuses: StatusDef[];
   recorderName: string;
+  usingSupabase: boolean;
   onRecord: (triggerCode: string) => void;
+  onUnrecord: (triggerCode: string) => void;
   onClose: () => void;
 }) {
   // 準備室ロールの楽観的上書き（roleName → state）
@@ -271,6 +275,65 @@ export default function BaseDetail({
         </div>
 
         <div className="dcol">
+          <h3>トリガー状態（手動変更）</h3>
+          <table style={{ marginBottom: 20 }}>
+            <tbody>
+              {triggers.map((t) => {
+                const achieved = base.achievedCodes.includes(t.code);
+                const log = base.history.find((h) => h.title.startsWith(`${t.code} `));
+                return (
+                  <tr key={t.code}>
+                    <td style={{ width: 42 }}>
+                      <b>{t.code}</b>
+                    </td>
+                    <td>{t.name}</td>
+                    <td style={{ width: 110 }}>
+                      {achieved ? (
+                        <span className="stat filled" style={{ ["--dc" as string]: "var(--green)" }}>
+                          成立 {log ? log.date : ""}
+                        </span>
+                      ) : (
+                        <span className="stat" style={{ ["--dc" as string]: "var(--lgray)", color: "var(--gray)" }}>
+                          未成立
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ width: 86, textAlign: "right" }}>
+                      {achieved ? (
+                        <button
+                          className="rec-btn"
+                          style={{ margin: 0, padding: "3px 10px", fontSize: 11, borderColor: "var(--line)", color: "var(--gray)" }}
+                          title={`${t.code} の成立を取り消して未成立に戻す`}
+                          onClick={() => {
+                            if (window.confirm(`${t.code} ${t.name} の成立を取り消して未成立に戻しますか？\n（成立記録は削除され、取り消しがアクティビティに残ります）`)) {
+                              onUnrecord(t.code);
+                            }
+                          }}
+                        >
+                          取り消す
+                        </button>
+                      ) : (
+                        <button
+                          className="rec-btn"
+                          style={{ margin: 0, padding: "3px 10px", fontSize: 11 }}
+                          title={`成立条件: ${t.criteria}`}
+                          onClick={() => onRecord(t.code)}
+                        >
+                          記録する
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!usingSupabase && (
+            <p style={{ fontSize: 10.5, color: "var(--red)", margin: "-12px 0 18px" }}>
+              ⚠ モックモード（Supabase未設定）: 変更は画面上のみで、再読み込みで元に戻ります。
+            </p>
+          )}
+
           <h3>Trigger Log</h3>
           <ul className="tl">
             {base.history.length ? (

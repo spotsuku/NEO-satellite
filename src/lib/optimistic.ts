@@ -13,6 +13,56 @@ export interface AppliedTrigger {
   recordedBy: string;
 }
 
+// 成立の取り消し（削除）を即時反映
+export function removeTriggerEvent(
+  data: DashboardData,
+  p: { baseCode: string; triggerCode: string; actorName: string },
+): DashboardData {
+  const trg = data.triggers.find((t) => t.code === p.triggerCode);
+  const bases = data.bases.map((b) => {
+    if (b.code !== p.baseCode) return b;
+    if (!b.achievedCodes.includes(p.triggerCode)) return b;
+    const achievedCodes = b.achievedCodes.filter((c) => c !== p.triggerCode);
+    const done = achievedCodes.length;
+    const clockStartIso = trg?.isClockStart ? null : b.clockStartIso;
+    const clock = computeClock(clockStartIso, b.deadlineDays, data.today);
+    const nextT =
+      data.triggers.find((t) => !achievedCodes.includes(t.code)) ??
+      data.triggers[data.triggers.length - 1];
+    return {
+      ...b,
+      achievedCodes,
+      done,
+      clockStartIso,
+      daysLeft: clock.daysLeft,
+      deadlineLabel: clock.deadlineLabel,
+      clockPct: clock.clockPct,
+      next: { code: nextT.code, name: nextT.name, note: b.next.note, ready: b.next.ready },
+      history: b.history.filter((h) => !h.title.startsWith(`${p.triggerCode} `)),
+    };
+  });
+
+  const base = data.bases.find((b) => b.code === p.baseCode);
+  const activity: ActivityItem = {
+    id: `local-undo-${p.baseCode}-${p.triggerCode}`,
+    date: mmdd(data.today),
+    isoDate: data.today,
+    baseName: base?.name ?? null,
+    kind: "system",
+    title: `${p.triggerCode} ${trg?.name ?? ""} の成立を取り消し`,
+    body: null,
+    isBig: false,
+    actorName: p.actorName,
+  };
+
+  return {
+    ...data,
+    bases,
+    activities: [activity, ...data.activities.filter((a) => a.id !== activity.id)],
+    company: { ...data.company, eventsDone: bases.reduce((s, b) => s + b.done, 0) },
+  };
+}
+
 export function applyTriggerEvent(data: DashboardData, p: AppliedTrigger): DashboardData {
   const trg = data.triggers.find((t) => t.code === p.triggerCode);
   const bases = data.bases.map((b) => {

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/types";
-import { applyTriggerEvent } from "@/lib/optimistic";
+import { applyTriggerEvent, removeTriggerEvent } from "@/lib/optimistic";
+import { deleteTriggerEvent } from "@/app/actions";
 import { getBrowserClient } from "@/lib/supabaseBrowser";
 import { Steps, Legend, TriggerInfoModal } from "./StepsLegend";
 import type { Trigger } from "@/lib/types";
@@ -69,6 +70,18 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
       return;
     }
     setRecordModal({ baseCode, initialCode });
+  }
+
+  // 成立の取り消し（T2成立 → 未成立に戻す等の手動変更）
+  async function onUnrecord(baseCode: string, triggerCode: string) {
+    const actorName = name || "匿名";
+    const res = await deleteTriggerEvent({ baseCode, triggerCode, actorName });
+    if (!res.ok) {
+      window.alert(res.error ?? "取り消しに失敗しました");
+      return;
+    }
+    setData((d) => removeTriggerEvent(d, { baseCode, triggerCode, actorName }));
+    if (data.usingSupabase) router.refresh();
   }
 
   // カードの T1〜T8 ドットクリック: 未成立→そのトリガーの成立記録 / 成立済み→詳細（ログ）
@@ -198,7 +211,9 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
                 stakeholders={data.stakeholders}
                 statuses={data.statuses}
                 recorderName={name || "匿名"}
+                usingSupabase={data.usingSupabase}
                 onRecord={(code) => openRecord(selectedBase.code, code)}
+                onUnrecord={(code) => onUnrecord(selectedBase.code, code)}
                 onClose={() => setSelected(null)}
               />
             )}
@@ -252,6 +267,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           initialCode={recordModal.initialCode}
           defaultDate={data.today}
           recordedBy={name || "匿名"}
+          usingSupabase={data.usingSupabase}
           onCancel={() => setRecordModal(null)}
           onRecorded={onRecorded}
         />
