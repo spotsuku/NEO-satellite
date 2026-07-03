@@ -277,6 +277,18 @@ tr.row:hover { background: var(--hover); }
 .ddl.idle { color: var(--lgray); }
 .card .nx { display: block; background: var(--ink); color: #fff; font-size: 11px; font-weight: 500; padding: 7px 12px; letter-spacing: .08em; }
 .card .nx b { color: var(--yellow); font-weight: 700; margin-right: 6px; font-family: 'Montserrat', sans-serif; }
+.card .nx-btn { cursor: pointer; position: relative; transition: opacity .12s; }
+.card .nx-btn:hover { opacity: .85; }
+.card .nx .nxrec { float: right; color: var(--yellow); font-weight: 700; letter-spacing: .04em; }
+.cardacts { display: flex; gap: 8px; margin-top: 8px; }
+.cardacts button { flex: 1; background: var(--paper); border: 1px solid var(--line); color: var(--gray); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; font-weight: 700; padding: 6px 4px; cursor: pointer; letter-spacing: .04em; }
+.cardacts button:hover { border-color: var(--ink); color: var(--ink); }
+
+/* 初回ヒントバー */
+.hintbar { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--ink); border-left: 4px solid var(--yellow); padding: 10px 14px; margin-bottom: 16px; font-size: 12px; line-height: 1.8; }
+.hintbar b { font-weight: 700; }
+.hintbar .hx { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--gray); width: 26px; height: 26px; cursor: pointer; flex: none; }
+.hintbar .hx:hover { border-color: var(--ink); color: var(--ink); }
 @media (max-width: 1100px) { .cards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 600px) { .cards { grid-template-columns: 1fr; } }
 

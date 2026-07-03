@@ -159,10 +159,39 @@ export default function BoardCards({
               </div>
             )}
 
-            <span className="nx">
+            <span
+              className="nx nx-btn"
+              title={`クリックで ${b.next.code} の成立を記録`}
+              onClick={(e) => {
+                e.stopPropagation();
+                const t = triggers.find((x) => x.code === b.next.code);
+                if (t) onDotClick(b.code, t);
+              }}
+            >
               <b>NEXT</b>
               {b.next.code} {b.next.name}
+              <span className="nxrec">✎ 記録</span>
             </span>
+            <div className="cardacts">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const t = triggers.find((x) => x.code === b.next.code);
+                  if (t) onDotClick(b.code, t);
+                }}
+              >
+                ✎ 成立を記録
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectBase(b.code);
+                }}
+                title="詳細の「トリガー状態」で成立/取り消しを一覧操作"
+              >
+                ⟲ 状態を手動変更
+              </button>
+            </div>
           </div>
         );
       })}

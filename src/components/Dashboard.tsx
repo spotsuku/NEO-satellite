@@ -20,6 +20,7 @@ import NameModal from "./NameModal";
 
 type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
+const HINT_KEY = "neo_hint_dismissed_v1";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const [name, setName] = useState<string>("");
   const [showName, setShowName] = useState(false);
   const [nameReady, setNameReady] = useState(false);
+  const [showHint, setShowHint] = useState(false);
   const pendingRecord = useRef<{ baseCode: string; initialCode: string } | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const recentLocal = useRef<Set<string>>(new Set());
@@ -45,7 +47,13 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     if (stored) setName(stored);
     else setShowName(true);
     setNameReady(true);
+    if (typeof window !== "undefined" && !window.localStorage.getItem(HINT_KEY)) setShowHint(true);
   }, []);
+
+  function dismissHint() {
+    setShowHint(false);
+    window.localStorage.setItem(HINT_KEY, "1");
+  }
 
   function saveName(n: string) {
     setName(n);
@@ -200,6 +208,17 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
 
       <main>
         <section className={`view ${tab === "board" ? "on" : ""}`}>
+          {showHint && (
+            <div className="hintbar">
+              <div>
+                <b>使い方</b> — トリガーの成立/取り消しは手動で操作できます：
+                ① カードの<b>「✎ 成立を記録」</b>で次のトリガーを記録（T1〜T8のドットやNEXTバーのクリックでも可）
+                ② <b>「⟲ 状態を手動変更」</b>で詳細を開き、「トリガー状態」一覧から任意のトリガーを成立⇄取り消し（T2をT1に戻す等）
+                ③ 上の<b>ステップ帯（T1〜T8）をクリック</b>すると各トリガーの成立条件が見られます
+              </div>
+              <button className="hx" onClick={dismissHint} aria-label="閉じる">×</button>
+            </div>
+          )}
           <Steps triggers={data.triggers} onInfo={setInfoTrigger} />
           <Legend />
           <BoardCards bases={data.bases} triggers={data.triggers} onSelectBase={selectBase} onDotClick={onDotClick} />
