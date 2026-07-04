@@ -94,13 +94,10 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     if (data.usingSupabase) router.refresh();
   }
 
-  // カードの T1〜T8 ドットクリック: 未成立→そのトリガーの成立記録 / 成立済み→詳細（ログ）
+  // カードの T1〜T8 ドットクリック: モーダルで成立記録／成立済みなら取り消し
   function onDotClick(baseCode: string, trigger: Trigger) {
-    const base = data.bases.find((b) => b.code === baseCode);
     selectBase(baseCode);
-    if (base && !base.achievedCodes.includes(trigger.code)) {
-      openRecord(baseCode, trigger.code);
-    }
+    openRecord(baseCode, trigger.code);
   }
 
   function onRecorded(p: RecordPayload) {
@@ -302,6 +299,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           usingSupabase={data.usingSupabase}
           onCancel={() => setRecordModal(null)}
           onRecorded={onRecorded}
+          onUnrecord={(code) => onUnrecord(recordModal.baseCode, code)}
         />
       )}
 
