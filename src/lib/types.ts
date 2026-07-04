@@ -78,8 +78,9 @@ export interface Stakeholder {
   baseCode: string;
   category: string;
   usesAmount: boolean;
-  name: string;
-  contactName: string;
+  name: string; // 所属（企業名/機関名。個人のみの場合は氏名）
+  contactName: string; // 氏名（担当者）
+  title: string; // 役職
   status: StatusName;
   commitAmount: number | null;
   approachedOn: string | null; // ISO

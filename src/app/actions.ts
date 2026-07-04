@@ -99,6 +99,7 @@ export interface UpdateStakeholderInput {
   commitAmount?: number | null;
   name?: string;
   contactName?: string;
+  title?: string;
   actorName: string;
 }
 
@@ -122,6 +123,7 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
     patch.name = input.name.trim();
   }
   if (input.contactName !== undefined) patch.contact_name = input.contactName || null;
+  if (input.title !== undefined) patch.title = input.title || null;
 
   const { error } = await db.from("stakeholders").update(patch).eq("id", input.id);
   if (error) return { ok: false, error: error.message };
@@ -174,6 +176,7 @@ export interface CreateStakeholderInput {
   category: string;
   name: string;
   contactName?: string;
+  title?: string;
   status: StatusName;
   commitAmount?: number | null;
   nextAction?: string;
@@ -198,6 +201,7 @@ export async function createStakeholder(input: CreateStakeholderInput): Promise<
     status_id: st.id,
     name: input.name.trim(),
     contact_name: input.contactName || null,
+    title: input.title || null,
     commit_amount: input.commitAmount ?? null,
     next_action: input.nextAction || null,
     approached_on: new Date().toISOString().slice(0, 10),
@@ -215,6 +219,7 @@ export interface BulkStakeholderRow {
   category: string;
   name: string;
   contactName?: string;
+  title?: string;
   status: StatusName;
   commitAmount?: number | null;
   nextAction?: string;
@@ -247,6 +252,7 @@ export async function createStakeholdersBulk(input: {
       status_id: stId.get(r.status),
       name: r.name.trim(),
       contact_name: r.contactName?.trim() || null,
+      title: r.title?.trim() || null,
       commit_amount: r.commitAmount ?? null,
       next_action: r.nextAction?.trim() || null,
       approached_on: today,

@@ -2,23 +2,38 @@
 
 import type { Trigger } from "@/lib/types";
 import TriggerChecklist from "./TriggerChecklist";
+import TriggerIcon from "./TriggerIcons";
 
+const ACCENTS = ["var(--yellow)", "var(--pink)", "var(--cyan)", "var(--green)"];
+
+// すごろく型ステップ帯: イラスト（ピクトグラム）＋タイトル＋説明のマスを矢印でつなぐ
 export function Steps({ triggers, onInfo }: { triggers: Trigger[]; onInfo: (t: Trigger) => void }) {
+  const last = triggers.length - 1;
   return (
-    <div className="steps">
-      {triggers.map((t) => (
-        <div
-          className="step"
-          key={t.code}
-          onClick={() => onInfo(t)}
-          title={`${t.code} ${t.name} — クリックで成立条件を表示`}
-        >
-          <span className="sid">{t.code}</span>
-          <div className="snm">{t.name}</div>
-          <div className="sdc">{t.description}</div>
-          <div className="shint">成立条件 ▸</div>
-        </div>
-      ))}
+    <div className="sugo">
+      {triggers.map((t, i) => {
+        const accent = ACCENTS[i % ACCENTS.length];
+        return (
+          <div
+            className="sq"
+            key={t.code}
+            onClick={() => onInfo(t)}
+            title={`${t.code} ${t.name} — クリックで成立条件を表示`}
+            style={{ ["--sq-accent" as string]: accent }}
+          >
+            {i === 0 && <span className="tag">START</span>}
+            {i === last && <span className="tag goal">GOAL</span>}
+            <span className="num">{t.code}</span>
+            <span className="icon">
+              <TriggerIcon code={t.code} accent={accent} />
+            </span>
+            <div className="snm">{t.name}</div>
+            <div className="sdc">{t.description}</div>
+            <div className="shint">成立条件 ▸</div>
+            {i < last && <span className="arrow">▶</span>}
+          </div>
+        );
+      })}
     </div>
   );
 }

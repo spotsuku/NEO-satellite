@@ -33,6 +33,7 @@ function AddModal({
   const [category, setCategory] = useState(categories[0]?.name ?? "オーナー候補");
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
+  const [title, setTitle] = useState("");
   const [status, setStatus] = useState<StatusName>("未アプローチ");
   const [amount, setAmount] = useState("");
   const [nextAction, setNextAction] = useState("");
@@ -54,6 +55,7 @@ function AddModal({
       category,
       name: name.trim(),
       contactName: contact,
+      title,
       status,
       commitAmount,
       nextAction,
@@ -73,6 +75,7 @@ function AddModal({
       usesAmount,
       name: name.trim(),
       contactName: contact || "—",
+      title,
       status,
       commitAmount,
       approachedOn: new Date().toISOString().slice(0, 10),
@@ -113,10 +116,18 @@ function AddModal({
               </select>
             </div>
           </div>
-          <label>名前（企業名/機関名/氏名）<span className="req">*</span></label>
+          <label>所属（企業名/機関名。個人のみの場合は氏名）<span className="req">*</span></label>
           <input type="text" value={name} autoFocus onChange={(e) => setName(e.target.value)} />
-          <label>担当者</label>
-          <input type="text" value={contact} onChange={(e) => setContact(e.target.value)} />
+          <div className="mrow2">
+            <div>
+              <label>氏名</label>
+              <input type="text" value={contact} onChange={(e) => setContact(e.target.value)} />
+            </div>
+            <div>
+              <label>役職</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+          </div>
           <div className="mrow2">
             <div>
               <label>ステータス</label>
@@ -180,6 +191,7 @@ export default function StakeholderTable({
     category: categories[0]?.name ?? "オーナー候補",
     name: "",
     contact: "",
+    title: "",
     status: "未アプローチ" as StatusName,
     amount: "",
     nextAction: "",
@@ -254,6 +266,10 @@ export default function StakeholderTable({
     if (contactName === s.contactName) return;
     await updateStakeholder({ id: s.id, contactName, actorName: recorderName });
   }
+  async function onTitle(s: Stakeholder, title: string) {
+    if (title === s.title) return;
+    await updateStakeholder({ id: s.id, title, actorName: recorderName });
+  }
   async function onDelete(s: Stakeholder) {
     if (!window.confirm(`「${s.name}」を削除しますか？\n（マップ上のノード・準備室の紐付けも解除されます）`)) return;
     setDeleted((p) => new Set(p).add(s.id));
@@ -285,6 +301,7 @@ export default function StakeholderTable({
       usesAmount: categories.find((c) => c.name === r.category)?.usesAmount ?? false,
       name: r.name,
       contactName: r.contactName || "—",
+      title: r.title ?? "",
       status: r.status,
       commitAmount: r.commitAmount ?? null,
       approachedOn: today,
@@ -296,6 +313,14 @@ export default function StakeholderTable({
     };
   }
 
+  // IME（日本語入力）の変換確定 Enter では追加しない。
+  // isComposing / keyCode 229（Safari 等）の間は無視する。
+  function onDraftEnter(e: React.KeyboardEvent) {
+    if (e.key !== "Enter") return;
+    if (e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) return;
+    commitDraft();
+  }
+
   // 追加行の確定（Enter または ＋ボタン）
   async function commitDraft() {
     const name = draft.name.trim();
@@ -305,12 +330,13 @@ export default function StakeholderTable({
       category: draft.category,
       name,
       contactName: draft.contact,
+      title: draft.title,
       status: draft.status,
       commitAmount: draft.amount !== "" ? Number(draft.amount) : null,
       nextAction: draft.nextAction,
     };
     setAdded((prev) => [localRow(row, 0), ...prev]);
-    setDraft((d) => ({ ...d, name: "", contact: "", amount: "", nextAction: "" }));
+    setDraft((d) => ({ ...d, name: "", contact: "", title: "", amount: "", nextAction: "" }));
     draftNameRef.current?.focus();
     const res = await createStakeholder({
       baseCode: row.baseCode,
@@ -354,11 +380,19 @@ export default function StakeholderTable({
       const name = c[i] ?? "";
       if (!name) continue;
       const contactName = c[i + 1] ?? "";
-      const status = (stSet.has(c[i + 2]) ? c[i + 2] : "未アプローチ") as StatusName;
-      const amountRaw = (c[i + 3] ?? "").replace(/[^\d]/g, "");
+      // 役職列は省略可: 次のセルがステータス名なら役職なしとみなす
+      let k = i + 2;
+      let title = "";
+      if (c[k] !== undefined && !stSet.has(c[k])) {
+        title = c[k] ?? "";
+        k += 1;
+      }
+      const status = (stSet.has(c[k]) ? c[k] : "未アプローチ") as StatusName;
+      if (stSet.has(c[k])) k += 1;
+      const amountRaw = (c[k] ?? "").replace(/[^\d]/g, "");
       const commitAmount = amountRaw ? Number(amountRaw) : null;
-      const nextAction = c[i + 4] ?? "";
-      rows.push({ baseCode, category, name, contactName, status, commitAmount, nextAction });
+      const nextAction = c[k + 1] ?? "";
+      rows.push({ baseCode, category, name, contactName, title, status, commitAmount, nextAction });
     }
     if (rows.length === 0) return;
     setAdded((prev) => [...rows.map(localRow), ...prev]);
@@ -374,13 +408,14 @@ export default function StakeholderTable({
 
   // 表示中の行をスプレッドシート形式（TSV）でコピー
   async function copyTsv() {
-    const head = ["拠点", "カテゴリ", "名前", "担当者", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
     const lines = rows.map((s) =>
       [
         s.baseName,
         s.category,
         s.name,
         s.contactName,
+        s.title,
         s.status,
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
@@ -393,7 +428,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "名前", "担当者", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -401,6 +436,7 @@ export default function StakeholderTable({
         s.category,
         s.name,
         s.contactName,
+        s.title,
         s.status,
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
@@ -455,8 +491,9 @@ export default function StakeholderTable({
           <tr>
             <th>拠点</th>
             <th>カテゴリ</th>
-            <th>名前</th>
-            <th>担当者</th>
+            <th>所属</th>
+            <th>氏名</th>
+            <th>役職</th>
             <th>ステータス</th>
             <th style={{ textAlign: "right" }}>金額(万)</th>
             <th>アプローチ日</th>
@@ -498,24 +535,30 @@ export default function StakeholderTable({
                 ref={draftNameRef}
                 className="inline-input"
                 style={{ fontWeight: 700, minWidth: 140 }}
-                placeholder="＋ 名前を入力（Enterで追加）／ ここに貼り付け"
+                placeholder="＋ 所属（企業/機関/個人名）を入力 ／ 貼り付けで一括"
                 value={draft.name}
                 onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitDraft();
-                }}
+                onKeyDown={onDraftEnter}
                 onPaste={handlePaste}
               />
             </td>
             <td>
               <input
                 className="inline-input"
-                placeholder="担当者"
+                placeholder="氏名"
                 value={draft.contact}
                 onChange={(e) => setDraft((d) => ({ ...d, contact: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitDraft();
-                }}
+                onKeyDown={onDraftEnter}
+                onPaste={handlePaste}
+              />
+            </td>
+            <td>
+              <input
+                className="inline-input"
+                placeholder="役職"
+                value={draft.title}
+                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                onKeyDown={onDraftEnter}
                 onPaste={handlePaste}
               />
             </td>
@@ -541,9 +584,7 @@ export default function StakeholderTable({
                   placeholder="万円"
                   value={draft.amount}
                   onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitDraft();
-                  }}
+                  onKeyDown={onDraftEnter}
                 />
               ) : (
                 <span className="dim">—</span>
@@ -556,9 +597,7 @@ export default function StakeholderTable({
                 placeholder="次回アクション"
                 value={draft.nextAction}
                 onChange={(e) => setDraft((d) => ({ ...d, nextAction: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitDraft();
-                }}
+                onKeyDown={onDraftEnter}
               />
             </td>
             <td>
@@ -608,6 +647,18 @@ export default function StakeholderTable({
                   onBlur={(e) => {
                     patch(s.id, { contactName: e.target.value || "—" });
                     onContact(s, e.target.value);
+                  }}
+                />
+              </td>
+              <td className="dim">
+                <input
+                  key={`t-${s.id}-${s.title}`}
+                  className="inline-input"
+                  defaultValue={s.title}
+                  placeholder="—"
+                  onBlur={(e) => {
+                    patch(s.id, { title: e.target.value });
+                    onTitle(s, e.target.value);
                   }}
                 />
               </td>

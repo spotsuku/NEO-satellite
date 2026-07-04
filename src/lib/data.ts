@@ -62,7 +62,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     db
       .from("stakeholders")
       .select(
-        "id,name,contact_name,commit_amount,approached_on,last_touched_on,next_action,next_action_due,is_sample,bases(code),categories(name,uses_amount),statuses(name)",
+        "id,name,contact_name,title,commit_amount,approached_on,last_touched_on,next_action,next_action_due,is_sample,bases(code),categories(name,uses_amount),statuses(name)",
       ),
     db
       .from("trigger_events")
@@ -120,6 +120,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       status: (one<any>(s.statuses)?.name ?? "未アプローチ") as StatusName,
       name: s.name,
       contact_name: s.contact_name ?? "—",
+      title: s.title ?? "",
       commit_amount: s.commit_amount,
       approached_on: s.approached_on,
       last_touched_on: s.last_touched_on,

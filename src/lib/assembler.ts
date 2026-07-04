@@ -78,6 +78,7 @@ export interface RawStakeholder {
   status: StatusName;
   name: string;
   contact_name: string;
+  title?: string | null; // 役職
   commit_amount: number | null;
   approached_on: string | null;
   last_touched_on: string | null;
@@ -200,6 +201,7 @@ export function buildDashboard(
       usesAmount: cat?.uses_amount ?? false,
       name: s.name,
       contactName: s.contact_name,
+      title: s.title ?? "",
       status: s.status,
       commitAmount: s.commit_amount,
       approachedOn: s.approached_on,

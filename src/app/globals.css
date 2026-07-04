@@ -225,6 +225,23 @@ tr.row:hover { background: var(--hover); }
 @media (max-width: 700px) { #cele .ct { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { #cele .cbar { animation-duration: .01s !important; } #cele .cmsg { animation-duration: .01s !important; } }
 
+/* ===== sugoroku step board（イラスト＋タイトル＋説明のマス）===== */
+.sugo { display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px 18px; margin-bottom: 22px; }
+.sugo .sq { position: relative; border: 2px solid var(--ink); background: var(--paper); padding: 12px 10px 10px; text-align: center; cursor: pointer; transition: transform .12s; }
+.sugo .sq::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: var(--sq-accent, var(--yellow)); }
+.sugo .sq:hover { transform: translateY(-3px); }
+.sugo .num { position: absolute; top: -2px; left: -2px; background: var(--ink); color: #fff; font-family: 'Montserrat', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .12em; padding: 3px 8px; }
+.sugo .tag { position: absolute; top: -2px; right: -2px; background: var(--ink); color: var(--yellow); font-family: 'Montserrat', sans-serif; font-size: 8px; font-weight: 700; letter-spacing: .22em; padding: 3px 7px; }
+.sugo .tag.goal { color: var(--pink); }
+.sugo .icon { display: flex; justify-content: center; margin: 16px 0 6px; }
+.sugo .snm { font-size: 12px; font-weight: 700; line-height: 1.45; }
+.sugo .sdc { font-size: 9.5px; color: var(--gray); line-height: 1.5; margin-top: 3px; min-height: 2.8em; }
+.sugo .shint { font-size: 8.5px; color: var(--lgray); letter-spacing: .08em; margin-top: 5px; }
+.sugo .sq:hover .shint { color: var(--ink); }
+.sugo .arrow { position: absolute; right: -15px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--ink); background: var(--paper); z-index: 1; padding: 1px; }
+@media (max-width: 1100px) { .sugo { grid-template-columns: repeat(4, 1fr); } .sugo .sq:nth-child(4) .arrow { display: none; } }
+@media (max-width: 600px) { .sugo { grid-template-columns: repeat(2, 1fr); } .sugo .arrow { display: none; } }
+
 /* ===== 8-step index ===== */
 .steps { display: flex; align-items: stretch; gap: 0; border: 1px solid var(--ink); margin-bottom: 20px; overflow: hidden; }
 .step { flex: 1; padding: 9px 8px 8px; border-right: 1px solid var(--line); position: relative; }
