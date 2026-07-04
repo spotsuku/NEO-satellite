@@ -95,6 +95,24 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     settings.error;
   if (firstError) throw firstError;
 
+  // チェックリスト進捗（テーブル未作成の既存DBでも全体を落とさない）
+  let checklistProgress: RawBundle["checklistProgress"] = [];
+  try {
+    const ck = await db
+      .from("trigger_checklist_progress")
+      .select("item_index,checked,bases(code),triggers(code)");
+    if (!ck.error) {
+      checklistProgress = ((ck.data ?? []) as any[]).map((c) => ({
+        base_code: one<any>(c.bases)?.code ?? "",
+        trigger_code: one<any>(c.triggers)?.code ?? "",
+        item_index: c.item_index,
+        checked: c.checked,
+      }));
+    }
+  } catch {
+    // schema.sql 未適用（trigger_checklist_progress なし）は無視
+  }
+
   // fuel: (base, metric) ごとに最新（noted_on desc の先頭）
   const seenFuel = new Set<string>();
   const latestFuels: RawBundle["fuels"] = [];
@@ -180,5 +198,6 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
         .filter((s) => typeof s.value === "number" || /^\d+$/.test(String(s.value)))
         .map((s) => [s.key, Number(s.value)]),
     ),
+    checklistProgress,
   };
 }

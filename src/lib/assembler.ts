@@ -154,6 +154,7 @@ export interface RawBundle {
   editorial?: RawEditorial[];
   mapNodes?: RawMapNode[];
   mapEdges?: RawMapEdge[];
+  checklistProgress?: { base_code: string; trigger_code: string; item_index: number; checked: boolean }[];
   fuelTargetOverrides?: { base_code: string; metric: string; target: number }[];
   settings?: Record<string, number>; // app_settings の燃料目標デフォルト等
 }
@@ -388,6 +389,12 @@ export function buildDashboard(
       fromNodeId: e.from_node,
       toNodeId: e.to_node,
       relType: e.rel_type,
+    })),
+    checklistProgress: (raw.checklistProgress ?? []).map((c) => ({
+      baseCode: c.base_code,
+      triggerCode: c.trigger_code,
+      itemIndex: c.item_index,
+      checked: c.checked,
     })),
   };
 }

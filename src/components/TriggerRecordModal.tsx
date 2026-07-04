@@ -24,6 +24,8 @@ export default function TriggerRecordModal({
   defaultDate,
   recordedBy,
   usingSupabase,
+  checklistChecked,
+  onChecklistToggle,
   onCancel,
   onRecorded,
   onUnrecord,
@@ -37,6 +39,8 @@ export default function TriggerRecordModal({
   defaultDate: string;
   recordedBy: string;
   usingSupabase: boolean;
+  checklistChecked: (triggerCode: string) => boolean[];
+  onChecklistToggle: (triggerCode: string, itemIndex: number) => void;
   onCancel: () => void;
   onRecorded: (p: RecordPayload) => void;
   onUnrecord: (triggerCode: string) => void;
@@ -49,8 +53,6 @@ export default function TriggerRecordModal({
   const [evidence, setEvidence] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 手動チェック（記録の目安。保存はしない）: triggerCode → checked[]
-  const [checks, setChecks] = useState<Record<string, boolean[]>>({});
 
   const selected = triggers.find((t) => t.code === code);
   const isAchieved = achievedCodes.includes(code);
@@ -117,15 +119,12 @@ export default function TriggerRecordModal({
               <TriggerChecklist
                 trigger={selected}
                 base={base}
-                checked={checks[selected.code] ?? []}
-                onToggle={(i) =>
-                  setChecks((p) => {
-                    const arr = [...(p[selected.code] ?? [])];
-                    arr[i] = !arr[i];
-                    return { ...p, [selected.code]: arr };
-                  })
-                }
+                checked={checklistChecked(selected.code)}
+                onToggle={(i) => onChecklistToggle(selected.code, i)}
               />
+              <p style={{ fontSize: 10, color: "var(--gray)", marginTop: 4 }}>
+                チェックは保存され、全員に共有されます（段階的に埋めていけます）
+              </p>
             </div>
           )}
 

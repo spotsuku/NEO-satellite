@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardData } from "@/lib/types";
 import { applyTriggerEvent, removeTriggerEvent } from "@/lib/optimistic";
-import { deleteTriggerEvent } from "@/app/actions";
+import { deleteTriggerEvent, setChecklistItem } from "@/app/actions";
 import { getBrowserClient } from "@/lib/supabaseBrowser";
 import { Steps, Legend, TriggerInfoModal } from "./StepsLegend";
 import type { Trigger } from "@/lib/types";
@@ -22,7 +22,7 @@ type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.4.0";
+export const APP_VERSION = "v0.5.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -81,6 +81,42 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     }
     setRecordModal({ baseCode, initialCode });
   }
+
+  // ---- 成立条件チェックリスト（保存・共有。段階的に埋まっていく）----
+  // 楽観的上書き: `${baseCode}:${triggerCode}` → { itemIndex: checked }
+  const [ckOverride, setCkOverride] = useState<Record<string, Record<number, boolean>>>({});
+
+  const checklistChecked = useCallback(
+    (baseCode: string, triggerCode: string): boolean[] => {
+      const out: boolean[] = [];
+      for (const p of data.checklistProgress) {
+        if (p.baseCode === baseCode && p.triggerCode === triggerCode) out[p.itemIndex] = p.checked;
+      }
+      const ov = ckOverride[`${baseCode}:${triggerCode}`];
+      if (ov) for (const [i, v] of Object.entries(ov)) out[Number(i)] = v;
+      return out;
+    },
+    [data.checklistProgress, ckOverride],
+  );
+
+  const onChecklistToggle = useCallback(
+    (baseCode: string, triggerCode: string, itemIndex: number) => {
+      const current = checklistChecked(baseCode, triggerCode)[itemIndex] ?? false;
+      const next = !current;
+      setCkOverride((p) => ({
+        ...p,
+        [`${baseCode}:${triggerCode}`]: { ...p[`${baseCode}:${triggerCode}`], [itemIndex]: next },
+      }));
+      void setChecklistItem({
+        baseCode,
+        triggerCode,
+        itemIndex,
+        checked: next,
+        actorName: name || "匿名",
+      });
+    },
+    [checklistChecked, name],
+  );
 
   // 成立の取り消し（T2成立 → 未成立に戻す等の手動変更）
   async function onUnrecord(baseCode: string, triggerCode: string) {
@@ -153,6 +189,9 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "map_edges" }, () => router.refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "prep_assignments" }, () => router.refresh())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "fuel_metrics" }, () => router.refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "trigger_checklist_progress" }, () =>
+        router.refresh(),
+      )
       .subscribe();
     return () => {
       db.removeChannel(ch);
@@ -240,6 +279,8 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
                 statuses={data.statuses}
                 recorderName={name || "匿名"}
                 usingSupabase={data.usingSupabase}
+                checklistChecked={(code) => checklistChecked(selectedBase.code, code)}
+                onChecklistToggle={(code, i) => onChecklistToggle(selectedBase.code, code, i)}
                 onRecord={(code) => openRecord(selectedBase.code, code)}
                 onUnrecord={(code) => onUnrecord(selectedBase.code, code)}
                 onClose={() => setSelected(null)}
@@ -297,6 +338,8 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           defaultDate={data.today}
           recordedBy={name || "匿名"}
           usingSupabase={data.usingSupabase}
+          checklistChecked={(code) => checklistChecked(recordModal.baseCode, code)}
+          onChecklistToggle={(code, i) => onChecklistToggle(recordModal.baseCode, code, i)}
           onCancel={() => setRecordModal(null)}
           onRecorded={onRecorded}
           onUnrecord={(code) => onUnrecord(recordModal.baseCode, code)}

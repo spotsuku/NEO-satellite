@@ -79,6 +79,8 @@ export default function BaseDetail({
   statuses,
   recorderName,
   usingSupabase,
+  checklistChecked,
+  onChecklistToggle,
   onRecord,
   onUnrecord,
   onClose,
@@ -89,6 +91,8 @@ export default function BaseDetail({
   statuses: StatusDef[];
   recorderName: string;
   usingSupabase: boolean;
+  checklistChecked: (triggerCode: string) => boolean[];
+  onChecklistToggle: (triggerCode: string, itemIndex: number) => void;
   onRecord: (triggerCode: string) => void;
   onUnrecord: (triggerCode: string) => void;
   onClose: () => void;
@@ -261,7 +265,13 @@ export default function BaseDetail({
             </div>
             {nextT && (
               <div style={{ marginTop: 10, borderTop: "1px solid #333", paddingTop: 10 }}>
-                <TriggerChecklist trigger={nextT} base={base} dark />
+                <TriggerChecklist
+                  trigger={nextT}
+                  base={base}
+                  dark
+                  checked={checklistChecked(nextT.code)}
+                  onToggle={(i) => onChecklistToggle(nextT.code, i)}
+                />
               </div>
             )}
           </div>

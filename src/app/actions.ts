@@ -404,6 +404,36 @@ export async function resetMapForBase(baseCode: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+// ---- 成立条件チェックリストの進捗保存（拠点×トリガー×項目・全員共有）----
+export async function setChecklistItem(input: {
+  baseCode: string;
+  triggerCode: string;
+  itemIndex: number;
+  checked: boolean;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const [{ data: base }, { data: trg }] = await Promise.all([
+    db.from("bases").select("id").eq("code", input.baseCode).single(),
+    db.from("triggers").select("id").eq("code", input.triggerCode).single(),
+  ]);
+  if (!base || !trg) return { ok: false, error: "拠点またはトリガーが見つかりません" };
+  const { error } = await db.from("trigger_checklist_progress").upsert(
+    {
+      base_id: base.id,
+      trigger_id: trg.id,
+      item_index: input.itemIndex,
+      checked: input.checked,
+      updated_by: input.actorName,
+    },
+    { onConflict: "base_id,trigger_id,item_index" },
+  );
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
 // ---- 準備室ロールの状態更新 ----
 export async function updatePrepAssignment(input: {
   baseCode: string;

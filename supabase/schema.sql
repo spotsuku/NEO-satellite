@@ -186,6 +186,18 @@ create table if not exists map_edges (
   unique (base_id, from_node, to_node)
 );
 
+-- 成立条件チェックリストの進捗（拠点×トリガー×項目。全員で共有・Realtime同期）
+create table if not exists trigger_checklist_progress (
+  id uuid primary key default gen_random_uuid(),
+  base_id uuid not null references bases(id),
+  trigger_id uuid not null references triggers(id),
+  item_index integer not null,
+  checked boolean not null default false,
+  updated_at timestamptz default now(),
+  updated_by text,
+  unique (base_id, trigger_id, item_index)
+);
+
 create table if not exists activities (
   id uuid primary key default gen_random_uuid(),
   base_id uuid references bases(id),
@@ -382,7 +394,7 @@ begin
   foreach t in array array[
     'bases','triggers','statuses','categories','prep_role_defs','rel_types','app_settings',
     'stakeholders','trigger_events','prep_assignments','fuel_metrics','fuel_targets',
-    'map_nodes','map_edges','activities'
+    'map_nodes','map_edges','activities','trigger_checklist_progress'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format('drop policy if exists %I on %I;', t || '_anon_select', t);
@@ -402,6 +414,7 @@ begin
     execute 'alter publication supabase_realtime add table map_nodes';
     execute 'alter publication supabase_realtime add table map_edges';
     execute 'alter publication supabase_realtime add table stakeholders';
+    execute 'alter publication supabase_realtime add table trigger_checklist_progress';
   end if;
 exception when duplicate_object then null;
 end $$;
