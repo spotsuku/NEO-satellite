@@ -1,9 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Stakeholder, StatusDef, BaseView } from "@/lib/types";
 import { isStale } from "@/lib/domain";
-import { createStakeholder, deleteStakeholder, updateStakeholder } from "@/app/actions";
+import {
+  createStakeholder,
+  createStakeholdersBulk,
+  deleteStakeholder,
+  updateStakeholder,
+  type BulkStakeholderRow,
+} from "@/app/actions";
 import type { StatusName } from "@/lib/types";
 
 const ALL = "すべて";
@@ -165,6 +171,27 @@ export default function StakeholderTable({
   const [overrides, setOverrides] = useState<Record<string, Partial<Stakeholder>>>({});
   const [added, setAdded] = useState<Stakeholder[]>([]);
   const [deleted, setDeleted] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
+  const [pasteMsg, setPasteMsg] = useState<string | null>(null);
+
+  // スプレッドシート式の追加行（拠点/カテゴリ/ステータスは連続入力向けに保持）
+  const [draft, setDraft] = useState({
+    baseCode: bases[0]?.code ?? "",
+    category: categories[0]?.name ?? "オーナー候補",
+    name: "",
+    contact: "",
+    status: "未アプローチ" as StatusName,
+    amount: "",
+    nextAction: "",
+  });
+  const draftNameRef = useRef<HTMLInputElement>(null);
+
+  // Realtime / refresh で本データが届いたら、楽観追加行の重複を落とす
+  useEffect(() => {
+    setAdded((prev) =>
+      prev.filter((a) => !stakeholders.some((s) => s.name === a.name && s.baseCode === a.baseCode)),
+    );
+  }, [stakeholders]);
 
   const baseNames = [ALL, ...bases.map((b) => b.name)];
   const catNames = [ALL, ...categories.map((c) => c.name)];
@@ -241,6 +268,130 @@ export default function StakeholderTable({
     }
   }
 
+  // 拠点フィルタを切り替えたら追加行の拠点も追従（連続入力しやすく）
+  useEffect(() => {
+    const b = bases.find((x) => x.name === fBase);
+    if (b) setDraft((d) => ({ ...d, baseCode: b.code }));
+  }, [fBase, bases]);
+
+  function localRow(r: BulkStakeholderRow, i: number): Stakeholder {
+    const base = bases.find((b) => b.code === r.baseCode);
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      id: `local-${Date.now()}-${i}`,
+      baseName: base?.name ?? r.baseCode,
+      baseCode: r.baseCode,
+      category: r.category,
+      usesAmount: categories.find((c) => c.name === r.category)?.usesAmount ?? false,
+      name: r.name,
+      contactName: r.contactName || "—",
+      status: r.status,
+      commitAmount: r.commitAmount ?? null,
+      approachedOn: today,
+      lastTouchedOn: today,
+      nextAction: r.nextAction ?? "",
+      nextActionDue: null,
+      isSample: false,
+      isStale: false,
+    };
+  }
+
+  // 追加行の確定（Enter または ＋ボタン）
+  async function commitDraft() {
+    const name = draft.name.trim();
+    if (!name) return;
+    const row: BulkStakeholderRow = {
+      baseCode: draft.baseCode,
+      category: draft.category,
+      name,
+      contactName: draft.contact,
+      status: draft.status,
+      commitAmount: draft.amount !== "" ? Number(draft.amount) : null,
+      nextAction: draft.nextAction,
+    };
+    setAdded((prev) => [localRow(row, 0), ...prev]);
+    setDraft((d) => ({ ...d, name: "", contact: "", amount: "", nextAction: "" }));
+    draftNameRef.current?.focus();
+    const res = await createStakeholder({
+      baseCode: row.baseCode,
+      category: row.category,
+      name: row.name,
+      contactName: row.contactName,
+      status: row.status,
+      commitAmount: row.commitAmount,
+      nextAction: row.nextAction,
+      actorName: recorderName,
+    });
+    if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
+  }
+
+  // スプレッドシート貼り付け（TSV）→ 一括登録
+  // 列の解釈: [拠点] [カテゴリ] 名前 担当者 ステータス 金額 次回アクション
+  // 拠点・カテゴリ列が無い場合は追加行の選択値を使用。ヘッダー行は自動スキップ。
+  async function handlePaste(e: React.ClipboardEvent) {
+    const text = e.clipboardData.getData("text");
+    if (!text.includes("\t") && !text.includes("\n")) return; // 通常の単セル貼り付けはそのまま
+    e.preventDefault();
+    const baseByName = new Map(bases.map((b) => [b.name, b.code]));
+    const catSet = new Set(categories.map((c) => c.name));
+    const stSet = new Set<string>(statuses.map((s) => s.name));
+    const rows: BulkStakeholderRow[] = [];
+    for (const line of text.split(/\r?\n/)) {
+      const c = line.split("\t").map((x) => x.trim());
+      if (c.every((x) => !x)) continue;
+      if (/名前|ステータス|カテゴリ/.test(c[0] + (c[1] ?? "") + (c[2] ?? ""))) continue; // ヘッダー行
+      let i = 0;
+      let baseCode = draft.baseCode;
+      let category = draft.category;
+      if (baseByName.has(c[0])) {
+        baseCode = baseByName.get(c[0])!;
+        i = 1;
+      }
+      if (catSet.has(c[i])) {
+        category = c[i];
+        i += 1;
+      }
+      const name = c[i] ?? "";
+      if (!name) continue;
+      const contactName = c[i + 1] ?? "";
+      const status = (stSet.has(c[i + 2]) ? c[i + 2] : "未アプローチ") as StatusName;
+      const amountRaw = (c[i + 3] ?? "").replace(/[^\d]/g, "");
+      const commitAmount = amountRaw ? Number(amountRaw) : null;
+      const nextAction = c[i + 4] ?? "";
+      rows.push({ baseCode, category, name, contactName, status, commitAmount, nextAction });
+    }
+    if (rows.length === 0) return;
+    setAdded((prev) => [...rows.map(localRow), ...prev]);
+    setPasteMsg(`${rows.length}件を貼り付け登録中…`);
+    const res = await createStakeholdersBulk({ rows, actorName: recorderName });
+    setPasteMsg(
+      res.ok
+        ? `✅ ${res.inserted ?? rows.length}件を登録しました${res.demo ? "（モック: 保存されません）" : ""}`
+        : `❌ ${res.error}`,
+    );
+    setTimeout(() => setPasteMsg(null), 4000);
+  }
+
+  // 表示中の行をスプレッドシート形式（TSV）でコピー
+  async function copyTsv() {
+    const head = ["拠点", "カテゴリ", "名前", "担当者", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
+    const lines = rows.map((s) =>
+      [
+        s.baseName,
+        s.category,
+        s.name,
+        s.contactName,
+        s.status,
+        s.commitAmount != null ? String(s.commitAmount) : "",
+        s.approachedOn ?? "",
+        s.nextAction,
+      ].join("\t"),
+    );
+    await navigator.clipboard.writeText([head.join("\t"), ...lines].join("\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   function exportCsv() {
     const head = ["拠点", "カテゴリ", "名前", "担当者", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -291,9 +442,11 @@ export default function StakeholderTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button className="on" onClick={() => setShowAdd(true)} style={{ marginLeft: "auto" }}>
-          ＋ 新規追加
-        </button>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--gray)", alignSelf: "center" }}>
+          {pasteMsg ?? "下の追加行に入力 ／ Excel・スプレッドシートから貼り付けで一括登録"}
+        </span>
+        <button onClick={copyTsv}>{copied ? "✓ コピーしました" : "表をコピー"}</button>
+        <button onClick={() => setShowAdd(true)}>フォームで追加</button>
         <button onClick={exportCsv}>CSVエクスポート</button>
       </div>
 
@@ -312,6 +465,123 @@ export default function StakeholderTable({
           </tr>
         </thead>
         <tbody>
+          {/* ===== スプレッドシート式 追加行 ===== */}
+          <tr style={{ background: "var(--hover)" }}>
+            <td>
+              <select
+                className="inline-input"
+                value={draft.baseCode}
+                onChange={(e) => setDraft((d) => ({ ...d, baseCode: e.target.value }))}
+              >
+                {bases.map((b) => (
+                  <option key={b.code} value={b.code}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td>
+              <select
+                className="inline-input"
+                value={draft.category}
+                onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+              >
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td>
+              <input
+                ref={draftNameRef}
+                className="inline-input"
+                style={{ fontWeight: 700, minWidth: 140 }}
+                placeholder="＋ 名前を入力（Enterで追加）／ ここに貼り付け"
+                value={draft.name}
+                onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitDraft();
+                }}
+                onPaste={handlePaste}
+              />
+            </td>
+            <td>
+              <input
+                className="inline-input"
+                placeholder="担当者"
+                value={draft.contact}
+                onChange={(e) => setDraft((d) => ({ ...d, contact: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitDraft();
+                }}
+                onPaste={handlePaste}
+              />
+            </td>
+            <td>
+              <select
+                className="inline-input"
+                value={draft.status}
+                onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as StatusName }))}
+              >
+                {statuses.map((st) => (
+                  <option key={st.name} value={st.name}>
+                    {st.name}
+                  </option>
+                ))}
+              </select>
+            </td>
+            <td className="amtcell">
+              {(categories.find((c) => c.name === draft.category)?.usesAmount ?? false) ? (
+                <input
+                  className="inline-input"
+                  style={{ textAlign: "right", maxWidth: 90 }}
+                  type="number"
+                  placeholder="万円"
+                  value={draft.amount}
+                  onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitDraft();
+                  }}
+                />
+              ) : (
+                <span className="dim">—</span>
+              )}
+            </td>
+            <td className="dim">今日</td>
+            <td>
+              <input
+                className="inline-input"
+                placeholder="次回アクション"
+                value={draft.nextAction}
+                onChange={(e) => setDraft((d) => ({ ...d, nextAction: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitDraft();
+                }}
+              />
+            </td>
+            <td>
+              <button
+                onClick={commitDraft}
+                disabled={!draft.name.trim()}
+                title="この行を追加（Enterでも追加）"
+                style={{
+                  background: draft.name.trim() ? "var(--ink)" : "var(--lgray)",
+                  color: "#fff",
+                  border: "none",
+                  width: 26,
+                  height: 26,
+                  cursor: draft.name.trim() ? "pointer" : "not-allowed",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                ＋
+              </button>
+            </td>
+          </tr>
+
           {rows.map((s) => (
             <tr className="row" key={s.id}>
               <td>{s.baseName}</td>

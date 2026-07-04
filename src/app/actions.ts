@@ -209,6 +209,58 @@ export async function createStakeholder(input: CreateStakeholderInput): Promise<
   return { ok: true };
 }
 
+// ---- ステークホルダー一括追加（スプレッドシート貼り付け用）----
+export interface BulkStakeholderRow {
+  baseCode: string;
+  category: string;
+  name: string;
+  contactName?: string;
+  status: StatusName;
+  commitAmount?: number | null;
+  nextAction?: string;
+}
+
+export async function createStakeholdersBulk(input: {
+  rows: BulkStakeholderRow[];
+  actorName: string;
+}): Promise<ActionResult & { inserted?: number }> {
+  const rows = input.rows.filter((r) => r.name?.trim());
+  if (rows.length === 0) return { ok: false, error: "登録対象がありません" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true, inserted: rows.length };
+
+  const [{ data: bases }, { data: cats }, { data: sts }] = await Promise.all([
+    db.from("bases").select("id,code"),
+    db.from("categories").select("id,name"),
+    db.from("statuses").select("id,name"),
+  ]);
+  const baseId = new Map((bases ?? []).map((b) => [b.code, b.id]));
+  const catId = new Map((cats ?? []).map((c) => [c.name, c.id]));
+  const stId = new Map((sts ?? []).map((s) => [s.name, s.id]));
+  const today = new Date().toISOString().slice(0, 10);
+
+  const payload = rows
+    .filter((r) => baseId.has(r.baseCode) && catId.has(r.category) && stId.has(r.status))
+    .map((r) => ({
+      base_id: baseId.get(r.baseCode),
+      category_id: catId.get(r.category),
+      status_id: stId.get(r.status),
+      name: r.name.trim(),
+      contact_name: r.contactName?.trim() || null,
+      commit_amount: r.commitAmount ?? null,
+      next_action: r.nextAction?.trim() || null,
+      approached_on: today,
+      is_sample: false,
+      updated_by: input.actorName,
+    }));
+  if (payload.length === 0) return { ok: false, error: "拠点・カテゴリ・ステータスを解決できませんでした" };
+
+  const { error, count } = await db.from("stakeholders").insert(payload, { count: "exact" });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true, inserted: count ?? payload.length };
+}
+
 // ---- 燃料記録（追記型）----
 export async function recordFuelMetrics(input: {
   baseCode: string;
