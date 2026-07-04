@@ -27,6 +27,17 @@ import {
 } from "./domain";
 import { PREFECTURE_PATHS } from "./prefectures";
 
+// DB の silhouette_path の妥当性チェック。
+// コピー時の欠落・プレースホルダ混入（「…（略）…」等）で壊れたパスは捨て、
+// 組み込みの県パス（PREFECTURE_PATHS）へフォールバックする。
+function validSilhouette(p: string | null | undefined): string | null {
+  if (!p) return null;
+  const t = p.trim();
+  if (t.length < 200) return null; // 実パスは数千文字。短すぎるものは破損とみなす
+  if (!/^[MLZmlz0-9 .,\-]+$/.test(t)) return null; // SVGパス以外の文字（日本語等）が混入
+  return t;
+}
+
 export interface RawBase {
   id: string;
   code: string;
@@ -303,7 +314,7 @@ export function buildDashboard(
         goalAmount: b.goal_amount,
         deadlineDays: b.deadline_days,
         accentColor: b.accent_color,
-        silhouettePath: b.silhouette_path ?? PREFECTURE_PATHS[b.code] ?? null,
+        silhouettePath: validSilhouette(b.silhouette_path) ?? PREFECTURE_PATHS[b.code] ?? null,
         done,
         triggersTotal,
         achievedCodes,
