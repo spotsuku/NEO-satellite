@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Stakeholder, StatusDef, BaseView } from "@/lib/types";
 import { isStale } from "@/lib/domain";
-import { createStakeholder, updateStakeholder } from "@/app/actions";
+import { createStakeholder, deleteStakeholder, updateStakeholder } from "@/app/actions";
 import type { StatusName } from "@/lib/types";
 
 const ALL = "すべて";
@@ -164,6 +164,7 @@ export default function StakeholderTable({
   // 楽観的更新の上書き（id → 差分）と追加行（Supabase モードでは refresh 後に本データへ）
   const [overrides, setOverrides] = useState<Record<string, Partial<Stakeholder>>>({});
   const [added, setAdded] = useState<Stakeholder[]>([]);
+  const [deleted, setDeleted] = useState<Set<string>>(new Set());
 
   const baseNames = [ALL, ...bases.map((b) => b.name)];
   const catNames = [ALL, ...categories.map((c) => c.name)];
@@ -191,6 +192,7 @@ export default function StakeholderTable({
 
   const rows = merged.filter(
     (s) =>
+      !deleted.has(s.id) &&
       (fBase === ALL || s.baseName === fBase) &&
       (fCat === ALL || s.category === fCat) &&
       (query === "" ||
@@ -216,6 +218,27 @@ export default function StakeholderTable({
     const commitAmount = raw === "" ? null : Number(raw);
     patch(s.id, { commitAmount });
     await updateStakeholder({ id: s.id, commitAmount, actorName: recorderName });
+  }
+  async function onName(s: Stakeholder, name: string) {
+    if (!name.trim() || name === s.name) return;
+    await updateStakeholder({ id: s.id, name, actorName: recorderName });
+  }
+  async function onContact(s: Stakeholder, contactName: string) {
+    if (contactName === s.contactName) return;
+    await updateStakeholder({ id: s.id, contactName, actorName: recorderName });
+  }
+  async function onDelete(s: Stakeholder) {
+    if (!window.confirm(`「${s.name}」を削除しますか？\n（マップ上のノード・準備室の紐付けも解除されます）`)) return;
+    setDeleted((p) => new Set(p).add(s.id));
+    const res = await deleteStakeholder({ id: s.id, actorName: recorderName });
+    if (!res.ok) {
+      window.alert(res.error ?? "削除に失敗しました");
+      setDeleted((p) => {
+        const n = new Set(p);
+        n.delete(s.id);
+        return n;
+      });
+    }
   }
 
   function exportCsv() {
@@ -285,6 +308,7 @@ export default function StakeholderTable({
             <th style={{ textAlign: "right" }}>金額(万)</th>
             <th>アプローチ日</th>
             <th>次回アクション</th>
+            <th style={{ width: 40 }} />
           </tr>
         </thead>
         <tbody>
@@ -293,10 +317,30 @@ export default function StakeholderTable({
               <td>{s.baseName}</td>
               <td className="dim">{s.category}</td>
               <td>
-                <b>{s.name}</b>
+                <input
+                  key={`n-${s.id}-${s.name}`}
+                  className="inline-input"
+                  style={{ fontWeight: 700, minWidth: 140 }}
+                  defaultValue={s.name}
+                  onBlur={(e) => {
+                    patch(s.id, { name: e.target.value });
+                    onName(s, e.target.value);
+                  }}
+                />
                 {s.isSample && <span className="samp">サンプル</span>}
               </td>
-              <td className="dim">{s.contactName}</td>
+              <td className="dim">
+                <input
+                  key={`c-${s.id}-${s.contactName}`}
+                  className="inline-input"
+                  defaultValue={s.contactName === "—" ? "" : s.contactName}
+                  placeholder="—"
+                  onBlur={(e) => {
+                    patch(s.id, { contactName: e.target.value || "—" });
+                    onContact(s, e.target.value);
+                  }}
+                />
+              </td>
               <td>
                 <span
                   className={`stat ${s.status !== "未アプローチ" ? "filled" : ""}`}
@@ -350,6 +394,31 @@ export default function StakeholderTable({
                     ⚠ {!s.nextAction ? "次回アクション未設定" : "14日以上停滞"}
                   </div>
                 )}
+              </td>
+              <td>
+                <button
+                  onClick={() => onDelete(s)}
+                  title="このステークホルダーを削除"
+                  style={{
+                    background: "none",
+                    border: "1px solid var(--line)",
+                    color: "var(--gray)",
+                    width: 26,
+                    height: 26,
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--red)";
+                    e.currentTarget.style.color = "var(--red)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--line)";
+                    e.currentTarget.style.color = "var(--gray)";
+                  }}
+                >
+                  ×
+                </button>
               </td>
             </tr>
           ))}

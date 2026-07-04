@@ -21,6 +21,8 @@ import NameModal from "./NameModal";
 type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
+// どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
+export const APP_VERSION = "v0.4.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -178,10 +180,20 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
         </div>
         <div className="right">
           <div>
-            {data.usingSupabase ? "Supabase 接続中" : "モックデータ表示中（Supabase未設定）"} — 最終更新 {data.today}
+            {data.usingSupabase ? "Supabase 接続中" : "モックデータ表示中（Supabase未設定）"} — 最終更新 {data.today} —{" "}
+            <b style={{ color: "var(--yellow)" }}>{APP_VERSION}</b>
           </div>
           <button className="name-btn" onClick={() => setShowName(true)} style={{ marginTop: 6 }}>
             記録者：<b>{name || "未設定"}</b>
+          </button>{" "}
+          <button
+            className="name-btn"
+            onClick={() => {
+              setTab("board");
+              setShowHint(true);
+            }}
+          >
+            ？使い方
           </button>{" "}
           <a href="/settings" className="name-btn" style={{ display: "inline-block", textDecoration: "none" }}>
             ⚙ 設定

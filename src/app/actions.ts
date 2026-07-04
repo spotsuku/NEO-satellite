@@ -97,6 +97,8 @@ export interface UpdateStakeholderInput {
   status?: StatusName;
   nextAction?: string;
   commitAmount?: number | null;
+  name?: string;
+  contactName?: string;
   actorName: string;
 }
 
@@ -115,9 +117,53 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   }
   if (input.nextAction !== undefined) patch.next_action = input.nextAction;
   if (input.commitAmount !== undefined) patch.commit_amount = input.commitAmount;
+  if (input.name !== undefined) {
+    if (!input.name.trim()) return { ok: false, error: "名前は空にできません" };
+    patch.name = input.name.trim();
+  }
+  if (input.contactName !== undefined) patch.contact_name = input.contactName || null;
 
   const { error } = await db.from("stakeholders").update(patch).eq("id", input.id);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ---- ステークホルダー削除 ----
+// 参照整合: 準備室割当は紐付け解除、マップノードは削除（エッジは cascade）した上で本体を削除。
+export async function deleteStakeholder(input: {
+  id: string;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+
+  const { data: sh } = await db
+    .from("stakeholders")
+    .select("id,name,base_id")
+    .eq("id", input.id)
+    .maybeSingle();
+  if (!sh) return { ok: false, error: "対象が見つかりません" };
+
+  const { error: prepErr } = await db
+    .from("prep_assignments")
+    .update({ stakeholder_id: null, updated_by: input.actorName })
+    .eq("stakeholder_id", input.id);
+  if (prepErr) return { ok: false, error: prepErr.message };
+
+  const { error: nodeErr } = await db.from("map_nodes").delete().eq("stakeholder_id", input.id);
+  if (nodeErr) return { ok: false, error: nodeErr.message };
+
+  const { error } = await db.from("stakeholders").delete().eq("id", input.id);
+  if (error) return { ok: false, error: error.message };
+
+  await db.from("activities").insert({
+    base_id: sh.base_id,
+    kind: "system",
+    title: `${sh.name} を削除`,
+    is_big: false,
+    actor_name: input.actorName,
+  });
   revalidatePath("/");
   return { ok: true };
 }
