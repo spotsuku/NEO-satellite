@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { DashboardData } from "@/lib/types";
+import type { DashboardData, TriggerNote } from "@/lib/types";
 import { applyTriggerEvent, removeTriggerEvent } from "@/lib/optimistic";
-import { deleteTriggerEvent, setChecklistItem } from "@/app/actions";
+import { deleteTriggerEvent, saveTriggerNote, setChecklistItem } from "@/app/actions";
 import { getBrowserClient } from "@/lib/supabaseBrowser";
 import { Steps, Legend, TriggerInfoModal } from "./StepsLegend";
 import type { Trigger } from "@/lib/types";
@@ -22,7 +22,7 @@ type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.5.0";
+export const APP_VERSION = "v0.5.1";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -118,6 +118,49 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     [checklistChecked, name],
   );
 
+  // ---- トリガーの状況メモ＋記録下書き（拠点×トリガー・全員共有）----
+  const [noteOverride, setNoteOverride] = useState<Record<string, TriggerNote>>({});
+
+  const noteFor = useCallback(
+    (baseCode: string, triggerCode: string): TriggerNote | null =>
+      noteOverride[`${baseCode}:${triggerCode}`] ??
+      data.triggerNotes.find((n) => n.baseCode === baseCode && n.triggerCode === triggerCode) ??
+      null,
+    [data.triggerNotes, noteOverride],
+  );
+
+  const onSaveNote = useCallback(
+    async (
+      baseCode: string,
+      triggerCode: string,
+      f: { note: string; draftAchievedOn: string; draftParticipants: string; draftEvidence: string },
+    ) => {
+      const actorName = name || "匿名";
+      setNoteOverride((p) => ({
+        ...p,
+        [`${baseCode}:${triggerCode}`]: {
+          baseCode,
+          triggerCode,
+          note: f.note,
+          draftAchievedOn: f.draftAchievedOn,
+          draftParticipants: f.draftParticipants,
+          draftEvidence: f.draftEvidence,
+          updatedBy: actorName,
+        },
+      }));
+      await saveTriggerNote({
+        baseCode,
+        triggerCode,
+        note: f.note,
+        draftAchievedOn: f.draftAchievedOn,
+        draftParticipants: f.draftParticipants,
+        draftEvidence: f.draftEvidence,
+        actorName,
+      });
+    },
+    [name],
+  );
+
   // 成立の取り消し（T2成立 → 未成立に戻す等の手動変更）
   async function onUnrecord(baseCode: string, triggerCode: string) {
     const actorName = name || "匿名";
@@ -138,6 +181,11 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
 
   function onRecorded(p: RecordPayload) {
     recentLocal.current.add(`${p.baseCode}:${p.triggerCode}`);
+    setNoteOverride((prev) => {
+      const next = { ...prev };
+      delete next[`${p.baseCode}:${p.triggerCode}`];
+      return next;
+    });
     setData((d) => applyTriggerEvent(d, p));
     setRecordModal(null);
     const base = data.bases.find((b) => b.code === p.baseCode);
@@ -151,6 +199,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   }
 
   // Realtime: 他メンバーの更新を購読（Supabase モードのみ）。
+  // 全テーブルを対象に、連続イベントは 400ms デバウンスでまとめて refresh。
   // 成立演出は activities(is_big) 起点 — 拠点名・T名・証拠つきのリッチ表示。
   useEffect(() => {
     if (!data.usingSupabase) return;
@@ -158,10 +207,33 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     if (!db) return;
     const baseNameById = new Map(data.bases.map((b) => [b.id, b.name]));
     const baseCodeById = new Map(data.bases.map((b) => [b.id, b.code]));
-    const ch = db
-      .channel("neo-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "activities" }, (payload) => {
-        router.refresh();
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refreshSoon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => router.refresh(), 400);
+    };
+
+    const TABLES = [
+      "stakeholders",
+      "trigger_events",
+      "prep_assignments",
+      "fuel_metrics",
+      "fuel_targets",
+      "map_nodes",
+      "map_edges",
+      "trigger_checklist_progress",
+      "trigger_notes",
+      "bases",
+      "triggers",
+      "statuses",
+      "app_settings",
+    ];
+    let ch = db.channel("neo-realtime").on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "activities" },
+      (payload) => {
+        refreshSoon();
         const row = payload.new as {
           title?: string;
           body?: string | null;
@@ -183,17 +255,22 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           title: row.title ?? "トリガー成立",
           subtitle: `${baseName}${baseName ? " — " : ""}${(row.body ?? "").slice(0, 80)}`,
         });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "stakeholders" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "map_nodes" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "map_edges" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "prep_assignments" }, () => router.refresh())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "fuel_metrics" }, () => router.refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "trigger_checklist_progress" }, () =>
-        router.refresh(),
-      )
-      .subscribe();
+      },
+    );
+    for (const table of TABLES) {
+      ch = ch.on("postgres_changes", { event: "*", schema: "public", table }, refreshSoon);
+    }
+    ch.subscribe();
+
+    // 保険: Realtime が届かない構成（publication 未設定等）でも
+    // 30秒ごとに再取得して「誰が記入しても更新」を保証する。
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 30000);
+
     return () => {
+      if (timer) clearTimeout(timer);
+      clearInterval(poll);
       db.removeChannel(ch);
     };
   }, [data.usingSupabase, data.bases, router]);
@@ -281,6 +358,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
                 usingSupabase={data.usingSupabase}
                 checklistChecked={(code) => checklistChecked(selectedBase.code, code)}
                 onChecklistToggle={(code, i) => onChecklistToggle(selectedBase.code, code, i)}
+                nextNote={noteFor(selectedBase.code, selectedBase.next.code)}
                 onRecord={(code) => openRecord(selectedBase.code, code)}
                 onUnrecord={(code) => onUnrecord(selectedBase.code, code)}
                 onClose={() => setSelected(null)}
@@ -340,6 +418,8 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           usingSupabase={data.usingSupabase}
           checklistChecked={(code) => checklistChecked(recordModal.baseCode, code)}
           onChecklistToggle={(code, i) => onChecklistToggle(recordModal.baseCode, code, i)}
+          noteFor={(code) => noteFor(recordModal.baseCode, code)}
+          onSaveNote={(code, f) => onSaveNote(recordModal.baseCode, code, f)}
           onCancel={() => setRecordModal(null)}
           onRecorded={onRecorded}
           onUnrecord={(code) => onUnrecord(recordModal.baseCode, code)}

@@ -51,6 +51,8 @@ export async function recordTriggerEvent(input: RecordTriggerInput): Promise<Act
     if (error.code === "23505") return { ok: false, error: "このトリガーは既に成立記録済みです" };
     return { ok: false, error: error.message };
   }
+  // 成立したら下書き・メモは役目を終えるので削除（テーブル未作成でも無害）
+  await db.from("trigger_notes").delete().eq("base_id", base.id).eq("trigger_id", trg.id);
   revalidatePath("/");
   return { ok: true };
 }
@@ -399,6 +401,40 @@ export async function resetMapForBase(baseCode: string): Promise<ActionResult> {
   if (!base) return { ok: false, error: "拠点が見つかりません" };
   // map_edges は from_node の cascade で消える
   const { error } = await db.from("map_nodes").delete().eq("base_id", base.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ---- トリガーの状況メモ＋成立記録の下書き（拠点×トリガーで1件・全員共有）----
+export async function saveTriggerNote(input: {
+  baseCode: string;
+  triggerCode: string;
+  note: string;
+  draftAchievedOn?: string | null;
+  draftParticipants?: string;
+  draftEvidence?: string;
+  actorName: string;
+}): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const [{ data: base }, { data: trg }] = await Promise.all([
+    db.from("bases").select("id").eq("code", input.baseCode).single(),
+    db.from("triggers").select("id").eq("code", input.triggerCode).single(),
+  ]);
+  if (!base || !trg) return { ok: false, error: "拠点またはトリガーが見つかりません" };
+  const { error } = await db.from("trigger_notes").upsert(
+    {
+      base_id: base.id,
+      trigger_id: trg.id,
+      note: input.note || null,
+      draft_achieved_on: input.draftAchievedOn || null,
+      draft_participants: input.draftParticipants || null,
+      draft_evidence: input.draftEvidence || null,
+      updated_by: input.actorName,
+    },
+    { onConflict: "base_id,trigger_id" },
+  );
   if (error) return { ok: false, error: error.message };
   revalidatePath("/");
   return { ok: true };

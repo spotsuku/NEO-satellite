@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { recordTriggerEvent } from "@/app/actions";
-import type { Trigger, BaseView } from "@/lib/types";
+import type { Trigger, BaseView, TriggerNote } from "@/lib/types";
 import TriggerChecklist from "./TriggerChecklist";
 
 export interface RecordPayload {
@@ -26,6 +26,8 @@ export default function TriggerRecordModal({
   usingSupabase,
   checklistChecked,
   onChecklistToggle,
+  noteFor,
+  onSaveNote,
   onCancel,
   onRecorded,
   onUnrecord,
@@ -41,6 +43,11 @@ export default function TriggerRecordModal({
   usingSupabase: boolean;
   checklistChecked: (triggerCode: string) => boolean[];
   onChecklistToggle: (triggerCode: string, itemIndex: number) => void;
+  noteFor: (triggerCode: string) => TriggerNote | null;
+  onSaveNote: (
+    triggerCode: string,
+    fields: { note: string; draftAchievedOn: string; draftParticipants: string; draftEvidence: string },
+  ) => Promise<void>;
   onCancel: () => void;
   onRecorded: (p: RecordPayload) => void;
   onUnrecord: (triggerCode: string) => void;
@@ -51,8 +58,35 @@ export default function TriggerRecordModal({
   const [achievedOn, setAchievedOn] = useState(defaultDate);
   const [participants, setParticipants] = useState("");
   const [evidence, setEvidence] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // トリガー切替時に保存済みの下書き・メモを読み込む
+  useEffect(() => {
+    const n = noteFor(code);
+    setNote(n?.note ?? "");
+    setAchievedOn(n?.draftAchievedOn ?? defaultDate);
+    setParticipants(n?.draftParticipants ?? "");
+    setEvidence(n?.draftEvidence ?? "");
+    setDraftSavedAt(null);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
+  async function saveDraft() {
+    setSavingDraft(true);
+    await onSaveNote(code, {
+      note,
+      draftAchievedOn: achievedOn,
+      draftParticipants: participants,
+      draftEvidence: evidence,
+    });
+    setSavingDraft(false);
+    setDraftSavedAt(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+  }
 
   const selected = triggers.find((t) => t.code === code);
   const isAchieved = achievedCodes.includes(code);
@@ -127,6 +161,14 @@ export default function TriggerRecordModal({
               </p>
             </div>
           )}
+
+          <label>状況メモ（全員に共有）</label>
+          <textarea
+            value={note}
+            style={{ minHeight: 48 }}
+            placeholder="例: もうちょっとで成立しそう。来週の会食で合意見込み"
+            onChange={(e) => setNote(e.target.value)}
+          />
 
           {isAchieved ? (
             <>
@@ -208,9 +250,20 @@ export default function TriggerRecordModal({
                 </p>
               )}
 
+              {draftSavedAt && (
+                <p style={{ fontSize: 11, color: "var(--gray)", marginTop: 8 }}>✅ 下書きを保存しました（{draftSavedAt}）</p>
+              )}
               <div className="mfoot">
                 <button className="save" onClick={submit} disabled={busy}>
                   {busy ? "保存中…" : "成立を記録して祝う"}
+                </button>
+                <button
+                  className="cancel"
+                  style={{ borderColor: "var(--cyan)", color: "var(--ink)", fontWeight: 700 }}
+                  onClick={saveDraft}
+                  disabled={savingDraft}
+                >
+                  {savingDraft ? "保存中…" : "下書き保存"}
                 </button>
                 <button className="cancel" onClick={onCancel}>
                   キャンセル

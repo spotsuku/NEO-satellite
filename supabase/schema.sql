@@ -198,6 +198,20 @@ create table if not exists trigger_checklist_progress (
   unique (base_id, trigger_id, item_index)
 );
 
+-- トリガーごとの状況メモ＋成立記録の下書き（拠点×トリガーで1件。全員共有）
+create table if not exists trigger_notes (
+  id uuid primary key default gen_random_uuid(),
+  base_id uuid not null references bases(id),
+  trigger_id uuid not null references triggers(id),
+  note text,                        -- 「もうちょっとで成立しそう」等の状況メモ
+  draft_achieved_on date,           -- 記録フォームの下書き
+  draft_participants text,
+  draft_evidence text,
+  updated_at timestamptz default now(),
+  updated_by text,
+  unique (base_id, trigger_id)
+);
+
 create table if not exists activities (
   id uuid primary key default gen_random_uuid(),
   base_id uuid references bases(id),
@@ -394,7 +408,7 @@ begin
   foreach t in array array[
     'bases','triggers','statuses','categories','prep_role_defs','rel_types','app_settings',
     'stakeholders','trigger_events','prep_assignments','fuel_metrics','fuel_targets',
-    'map_nodes','map_edges','activities','trigger_checklist_progress'
+    'map_nodes','map_edges','activities','trigger_checklist_progress','trigger_notes'
   ] loop
     execute format('alter table %I enable row level security;', t);
     execute format('drop policy if exists %I on %I;', t || '_anon_select', t);
@@ -404,17 +418,21 @@ begin
   end loop;
 end $$;
 
--- Realtime 購読対象（読み取り専用）
--- Supabase ダッシュボード or 下記で publication に追加。
+-- Realtime 購読対象（読み取り専用）— 全テーブルを publication に追加（冪等）。
+-- 「誰が記入しても全員の画面が更新される」ため、マスタ含め全対象。
 do $$
+declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    execute 'alter publication supabase_realtime add table activities';
-    execute 'alter publication supabase_realtime add table trigger_events';
-    execute 'alter publication supabase_realtime add table map_nodes';
-    execute 'alter publication supabase_realtime add table map_edges';
-    execute 'alter publication supabase_realtime add table stakeholders';
-    execute 'alter publication supabase_realtime add table trigger_checklist_progress';
+    foreach t in array array[
+      'bases','triggers','statuses','categories','prep_role_defs','rel_types','app_settings',
+      'stakeholders','trigger_events','prep_assignments','fuel_metrics','fuel_targets',
+      'map_nodes','map_edges','activities','trigger_checklist_progress','trigger_notes'
+    ] loop
+      begin
+        execute format('alter publication supabase_realtime add table %I', t);
+      exception when duplicate_object then null;
+      end;
+    end loop;
   end if;
-exception when duplicate_object then null;
 end $$;

@@ -173,4 +173,16 @@ export interface DashboardData {
   mapEdges: MapEdgeView[];
   // 成立条件チェックリストの進捗（手動項目のみ。自動項目は都度計算）
   checklistProgress: { baseCode: string; triggerCode: string; itemIndex: number; checked: boolean }[];
+  // トリガーごとの状況メモ＋記録下書き（拠点×トリガーで1件）
+  triggerNotes: TriggerNote[];
+}
+
+export interface TriggerNote {
+  baseCode: string;
+  triggerCode: string;
+  note: string;
+  draftAchievedOn: string | null;
+  draftParticipants: string;
+  draftEvidence: string;
+  updatedBy: string | null;
 }

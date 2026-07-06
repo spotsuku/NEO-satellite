@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { BaseView, Trigger, Stakeholder, StatusDef, PrepState } from "@/lib/types";
+import type { BaseView, Trigger, Stakeholder, StatusDef, PrepState, TriggerNote } from "@/lib/types";
 import { YEN, pct } from "@/lib/domain";
 import { updatePrepAssignment, recordFuelMetrics } from "@/app/actions";
 import MoneyBar from "./MoneyBar";
@@ -81,6 +81,7 @@ export default function BaseDetail({
   usingSupabase,
   checklistChecked,
   onChecklistToggle,
+  nextNote,
   onRecord,
   onUnrecord,
   onClose,
@@ -93,6 +94,7 @@ export default function BaseDetail({
   usingSupabase: boolean;
   checklistChecked: (triggerCode: string) => boolean[];
   onChecklistToggle: (triggerCode: string, itemIndex: number) => void;
+  nextNote?: TriggerNote | null;
   onRecord: (triggerCode: string) => void;
   onUnrecord: (triggerCode: string) => void;
   onClose: () => void;
@@ -263,6 +265,14 @@ export default function BaseDetail({
                 </>
               )}
             </div>
+            {nextNote?.note && (
+              <div className="nd" style={{ marginTop: 8, color: "var(--yellow)" }}>
+                📝 {nextNote.note}
+                {nextNote.updatedBy && (
+                  <span style={{ color: "var(--lgray)" }}>（{nextNote.updatedBy}）</span>
+                )}
+              </div>
+            )}
             {nextT && (
               <div style={{ marginTop: 10, borderTop: "1px solid #333", paddingTop: 10 }}>
                 <TriggerChecklist

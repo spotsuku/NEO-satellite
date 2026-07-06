@@ -205,6 +205,24 @@ export default function StakeholderTable({
     );
   }, [stakeholders]);
 
+  // サーバーに反映済みの楽観上書きは破棄する。
+  // 残したままだと他メンバーの更新（Realtime）が上書きで隠れてしまう。
+  useEffect(() => {
+    setOverrides((prev) => {
+      const next: Record<string, Partial<Stakeholder>> = {};
+      for (const [id, ov] of Object.entries(prev)) {
+        const server = stakeholders.find((s) => s.id === id);
+        if (!server) continue;
+        const pending: Partial<Stakeholder> = {};
+        for (const [k, v] of Object.entries(ov)) {
+          if (server[k as keyof Stakeholder] !== v) (pending as Record<string, unknown>)[k] = v;
+        }
+        if (Object.keys(pending).length) next[id] = pending;
+      }
+      return next;
+    });
+  }, [stakeholders]);
+
   const baseNames = [ALL, ...bases.map((b) => b.name)];
   const catNames = [ALL, ...categories.map((c) => c.name)];
 

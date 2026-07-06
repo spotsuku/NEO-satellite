@@ -155,6 +155,15 @@ export interface RawBundle {
   mapNodes?: RawMapNode[];
   mapEdges?: RawMapEdge[];
   checklistProgress?: { base_code: string; trigger_code: string; item_index: number; checked: boolean }[];
+  triggerNotes?: {
+    base_code: string;
+    trigger_code: string;
+    note: string | null;
+    draft_achieved_on: string | null;
+    draft_participants: string | null;
+    draft_evidence: string | null;
+    updated_by: string | null;
+  }[];
   fuelTargetOverrides?: { base_code: string; metric: string; target: number }[];
   settings?: Record<string, number>; // app_settings の燃料目標デフォルト等
 }
@@ -395,6 +404,15 @@ export function buildDashboard(
       triggerCode: c.trigger_code,
       itemIndex: c.item_index,
       checked: c.checked,
+    })),
+    triggerNotes: (raw.triggerNotes ?? []).map((n) => ({
+      baseCode: n.base_code,
+      triggerCode: n.trigger_code,
+      note: n.note ?? "",
+      draftAchievedOn: n.draft_achieved_on,
+      draftParticipants: n.draft_participants ?? "",
+      draftEvidence: n.draft_evidence ?? "",
+      updatedBy: n.updated_by,
     })),
   };
 }

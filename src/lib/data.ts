@@ -113,6 +113,27 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     // schema.sql 未適用（trigger_checklist_progress なし）は無視
   }
 
+  // 状況メモ・下書き（テーブル未作成でも全体を落とさない）
+  let triggerNotes: RawBundle["triggerNotes"] = [];
+  try {
+    const tn = await db
+      .from("trigger_notes")
+      .select("note,draft_achieved_on,draft_participants,draft_evidence,updated_by,bases(code),triggers(code)");
+    if (!tn.error) {
+      triggerNotes = ((tn.data ?? []) as any[]).map((n) => ({
+        base_code: one<any>(n.bases)?.code ?? "",
+        trigger_code: one<any>(n.triggers)?.code ?? "",
+        note: n.note,
+        draft_achieved_on: n.draft_achieved_on,
+        draft_participants: n.draft_participants,
+        draft_evidence: n.draft_evidence,
+        updated_by: n.updated_by,
+      }));
+    }
+  } catch {
+    // schema.sql 未適用は無視
+  }
+
   // fuel: (base, metric) ごとに最新（noted_on desc の先頭）
   const seenFuel = new Set<string>();
   const latestFuels: RawBundle["fuels"] = [];
@@ -199,5 +220,6 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
         .map((s) => [s.key, Number(s.value)]),
     ),
     checklistProgress,
+    triggerNotes,
   };
 }
