@@ -22,7 +22,7 @@ type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.5.1";
+export const APP_VERSION = "v0.5.2";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -89,7 +89,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const checklistChecked = useCallback(
     (baseCode: string, triggerCode: string): boolean[] => {
       const out: boolean[] = [];
-      for (const p of data.checklistProgress) {
+      for (const p of data.checklistProgress ?? []) {
         if (p.baseCode === baseCode && p.triggerCode === triggerCode) out[p.itemIndex] = p.checked;
       }
       const ov = ckOverride[`${baseCode}:${triggerCode}`];
@@ -124,7 +124,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const noteFor = useCallback(
     (baseCode: string, triggerCode: string): TriggerNote | null =>
       noteOverride[`${baseCode}:${triggerCode}`] ??
-      data.triggerNotes.find((n) => n.baseCode === baseCode && n.triggerCode === triggerCode) ??
+      (data.triggerNotes ?? []).find((n) => n.baseCode === baseCode && n.triggerCode === triggerCode) ??
       null,
     [data.triggerNotes, noteOverride],
   );
