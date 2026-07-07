@@ -34,6 +34,7 @@ export const MOCK_BUNDLE: RawBundle = {
   ],
   categories: [
     { name: "オーナー候補", uses_amount: true },
+    { name: "企業会員候補", uses_amount: false },
     { name: "教育機関", uses_amount: false },
     { name: "自治体・メディア", uses_amount: false },
     { name: "事務局", uses_amount: false },

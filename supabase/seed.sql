@@ -67,12 +67,13 @@ on conflict (name) do update
 -- ---------- カテゴリ ----------
 insert into categories (name, uses_amount, default_zone_x, default_zone_y, sort) values
   ('オーナー候補',     true,  0.10, 0.10, 1),
-  ('教育機関',         false, 0.68, 0.12, 2),
-  ('自治体・メディア', false, 0.12, 0.72, 3),
-  ('事務局',           false, 0.68, 0.70, 4),
-  ('学生事務局',       false, 0.72, 0.40, 5),
-  ('紹介役',           false, 0.12, 0.40, 6),
-  ('その他',           false, 0.45, 0.75, 7)
+  ('企業会員候補',     false, 0.40, 0.10, 2),
+  ('教育機関',         false, 0.68, 0.12, 3),
+  ('自治体・メディア', false, 0.12, 0.72, 4),
+  ('事務局',           false, 0.68, 0.70, 5),
+  ('学生事務局',       false, 0.72, 0.40, 6),
+  ('紹介役',           false, 0.12, 0.40, 7),
+  ('その他',           false, 0.45, 0.75, 8)
 on conflict (name) do update
   set uses_amount = excluded.uses_amount, default_zone_x = excluded.default_zone_x,
       default_zone_y = excluded.default_zone_y, sort = excluded.sort;

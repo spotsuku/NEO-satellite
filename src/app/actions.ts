@@ -105,6 +105,7 @@ export interface UpdateStakeholderInput {
   baseCode?: string; // 拠点の付け替え
   category?: string; // カテゴリ変更
   approachedOn?: string | null; // アプローチ日
+  url?: string; // 関連URL
   actorName: string;
 }
 
@@ -130,6 +131,7 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   if (input.contactName !== undefined) patch.contact_name = input.contactName || null;
   if (input.title !== undefined) patch.title = input.title || null;
   if (input.approachedOn !== undefined) patch.approached_on = input.approachedOn || null;
+  if (input.url !== undefined) patch.link = input.url || null;
   if (input.category !== undefined) {
     const { data: cat } = await db.from("categories").select("id").eq("name", input.category).single();
     if (!cat) return { ok: false, error: "カテゴリが見つかりません" };
@@ -198,6 +200,7 @@ export interface CreateStakeholderInput {
   status: StatusName;
   commitAmount?: number | null;
   nextAction?: string;
+  url?: string;
   actorName: string;
 }
 
@@ -222,6 +225,7 @@ export async function createStakeholder(input: CreateStakeholderInput): Promise<
     title: input.title || null,
     commit_amount: input.commitAmount ?? null,
     next_action: input.nextAction || null,
+    link: input.url || null,
     approached_on: new Date().toISOString().slice(0, 10),
     is_sample: false,
     updated_by: input.actorName,
@@ -241,6 +245,7 @@ export interface BulkStakeholderRow {
   status: StatusName;
   commitAmount?: number | null;
   nextAction?: string;
+  url?: string;
 }
 
 export async function createStakeholdersBulk(input: {
@@ -273,6 +278,7 @@ export async function createStakeholdersBulk(input: {
       title: r.title?.trim() || null,
       commit_amount: r.commitAmount ?? null,
       next_action: r.nextAction?.trim() || null,
+      link: r.url?.trim() || null,
       approached_on: today,
       is_sample: false,
       updated_by: input.actorName,
@@ -397,6 +403,77 @@ export async function addMapEdge(input: {
     created_by: input.actorName,
   });
   if (error && error.code !== "23505") return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// フリーノード（写真・付箋）の追加。画像は縮小済み data URL（<=300KB）を想定。
+export async function addFreeMapNode(input: {
+  baseCode: string;
+  x: number;
+  y: number;
+  label?: string;
+  imageDataUrl?: string | null;
+  url?: string;
+  memo?: string;
+  actorName: string;
+}): Promise<ActionResult & { nodeId?: string }> {
+  if (input.imageDataUrl && input.imageDataUrl.length > 300_000)
+    return { ok: false, error: "画像が大きすぎます（縮小に失敗した可能性）" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { data: base } = await db.from("bases").select("id").eq("code", input.baseCode).single();
+  if (!base) return { ok: false, error: "拠点が見つかりません" };
+  const { data, error } = await db
+    .from("map_nodes")
+    .insert({
+      base_id: base.id,
+      kind: "free",
+      label: input.label || null,
+      image_url: input.imageDataUrl || null,
+      url: input.url || null,
+      memo: input.memo || null,
+      x: input.x,
+      y: input.y,
+      updated_by: input.actorName,
+    })
+    .select("id")
+    .single();
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true, nodeId: data?.id };
+}
+
+// ノードのメタ（ラベル・URL・メモ・画像）更新
+export async function updateMapNodeMeta(input: {
+  nodeId: string;
+  label?: string;
+  url?: string;
+  memo?: string;
+  imageDataUrl?: string | null;
+  actorName: string;
+}): Promise<ActionResult> {
+  if (input.imageDataUrl && input.imageDataUrl.length > 300_000)
+    return { ok: false, error: "画像が大きすぎます" };
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const patch: Record<string, unknown> = { updated_by: input.actorName };
+  if (input.label !== undefined) patch.label = input.label || null;
+  if (input.url !== undefined) patch.url = input.url || null;
+  if (input.memo !== undefined) patch.memo = input.memo || null;
+  if (input.imageDataUrl !== undefined) patch.image_url = input.imageDataUrl || null;
+  const { error } = await db.from("map_nodes").update(patch).eq("id", input.nodeId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ノード削除（ステークホルダーノードは未配置プールへ戻る扱い）
+export async function deleteMapNode(nodeId: string): Promise<ActionResult> {
+  const db = getServiceClient();
+  if (!db) return { ok: true, demo: true };
+  const { error } = await db.from("map_nodes").delete().eq("id", nodeId);
+  if (error) return { ok: false, error: error.message };
   revalidatePath("/");
   return { ok: true };
 }

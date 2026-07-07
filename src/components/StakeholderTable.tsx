@@ -37,6 +37,7 @@ function AddModal({
   const [status, setStatus] = useState<StatusName>("未アプローチ");
   const [amount, setAmount] = useState("");
   const [nextAction, setNextAction] = useState("");
+  const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ function AddModal({
       status,
       commitAmount,
       nextAction,
+      url,
       actorName: recorderName,
     });
     setBusy(false);
@@ -82,6 +84,7 @@ function AddModal({
       lastTouchedOn: new Date().toISOString().slice(0, 10),
       nextAction,
       nextActionDue: null,
+      url,
       isSample: false,
       isStale: false,
     });
@@ -146,6 +149,8 @@ function AddModal({
           </div>
           <label>次回アクション</label>
           <input type="text" value={nextAction} onChange={(e) => setNextAction(e.target.value)} />
+          <label>URL（会社サイト・資料など）</label>
+          <input type="text" value={url} placeholder="https://" onChange={(e) => setUrl(e.target.value)} />
           {error && <div className="err">{error}</div>}
           <div className="mfoot">
             <button className="save" onClick={save} disabled={busy}>
@@ -195,6 +200,7 @@ export default function StakeholderTable({
     status: "未アプローチ" as StatusName,
     amount: "",
     nextAction: "",
+    url: "",
   });
   const draftNameRef = useRef<HTMLInputElement>(null);
 
@@ -298,6 +304,10 @@ export default function StakeholderTable({
     patch(s.id, { category, usesAmount });
     await updateStakeholder({ id: s.id, category, actorName: recorderName });
   }
+  async function onUrl(s: Stakeholder, url: string) {
+    if (url === s.url) return;
+    await updateStakeholder({ id: s.id, url, actorName: recorderName });
+  }
   async function onApproached(s: Stakeholder, approachedOn: string) {
     patch(s.id, { approachedOn: approachedOn || null });
     await updateStakeholder({ id: s.id, approachedOn: approachedOn || null, actorName: recorderName });
@@ -340,6 +350,7 @@ export default function StakeholderTable({
       lastTouchedOn: today,
       nextAction: r.nextAction ?? "",
       nextActionDue: null,
+      url: r.url ?? "",
       isSample: false,
       isStale: false,
     };
@@ -366,9 +377,10 @@ export default function StakeholderTable({
       status: draft.status,
       commitAmount: draft.amount !== "" ? Number(draft.amount) : null,
       nextAction: draft.nextAction,
+      url: draft.url,
     };
     setAdded((prev) => [localRow(row, 0), ...prev]);
-    setDraft((d) => ({ ...d, name: "", contact: "", title: "", amount: "", nextAction: "" }));
+    setDraft((d) => ({ ...d, name: "", contact: "", title: "", amount: "", nextAction: "", url: "" }));
     draftNameRef.current?.focus();
     const res = await createStakeholder({
       baseCode: row.baseCode,
@@ -378,6 +390,7 @@ export default function StakeholderTable({
       status: row.status,
       commitAmount: row.commitAmount,
       nextAction: row.nextAction,
+      url: row.url,
       actorName: recorderName,
     });
     if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
@@ -424,7 +437,8 @@ export default function StakeholderTable({
       const amountRaw = (c[k] ?? "").replace(/[^\d]/g, "");
       const commitAmount = amountRaw ? Number(amountRaw) : null;
       const nextAction = c[k + 1] ?? "";
-      rows.push({ baseCode, category, name, contactName, title, status, commitAmount, nextAction });
+      const url = c[k + 2] ?? "";
+      rows.push({ baseCode, category, name, contactName, title, status, commitAmount, nextAction, url });
     }
     if (rows.length === 0) return;
     setAdded((prev) => [...rows.map(localRow), ...prev]);
@@ -440,7 +454,7 @@ export default function StakeholderTable({
 
   // 表示中の行をスプレッドシート形式（TSV）でコピー
   async function copyTsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "URL"];
     const lines = rows.map((s) =>
       [
         s.baseName,
@@ -452,6 +466,7 @@ export default function StakeholderTable({
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
         s.nextAction,
+        s.url,
       ].join("\t"),
     );
     await navigator.clipboard.writeText([head.join("\t"), ...lines].join("\n"));
@@ -460,7 +475,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "URL"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -473,6 +488,7 @@ export default function StakeholderTable({
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
         s.nextAction,
+        s.url,
       ]
         .map((v) => esc(String(v)))
         .join(","),
@@ -530,6 +546,7 @@ export default function StakeholderTable({
             <th style={{ textAlign: "right" }}>金額(万)</th>
             <th>アプローチ日</th>
             <th>次回アクション</th>
+            <th style={{ width: 150 }}>URL</th>
             <th style={{ width: 40 }} />
           </tr>
         </thead>
@@ -629,6 +646,15 @@ export default function StakeholderTable({
                 placeholder="次回アクション"
                 value={draft.nextAction}
                 onChange={(e) => setDraft((d) => ({ ...d, nextAction: e.target.value }))}
+                onKeyDown={onDraftEnter}
+              />
+            </td>
+            <td>
+              <input
+                className="inline-input"
+                placeholder="https://"
+                value={draft.url}
+                onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
                 onKeyDown={onDraftEnter}
               />
             </td>
@@ -778,6 +804,31 @@ export default function StakeholderTable({
                     ⚠ {!s.nextAction ? "次回アクション未設定" : "14日以上停滞"}
                   </div>
                 )}
+              </td>
+              <td>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <input
+                    key={`u-${s.id}-${s.url}`}
+                    className="inline-input"
+                    placeholder="https://"
+                    defaultValue={s.url}
+                    onBlur={(e) => {
+                      patch(s.id, { url: e.target.value });
+                      onUrl(s, e.target.value);
+                    }}
+                  />
+                  {s.url && /^https?:\/\//.test(s.url) && (
+                    <a
+                      href={s.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={s.url}
+                      style={{ color: "var(--cyan)", fontWeight: 700, textDecoration: "none", flex: "none" }}
+                    >
+                      ↗
+                    </a>
+                  )}
+                </div>
               </td>
               <td>
                 <button

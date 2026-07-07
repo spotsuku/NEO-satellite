@@ -87,6 +87,7 @@ export interface Stakeholder {
   lastTouchedOn: string | null;
   nextAction: string;
   nextActionDue: string | null;
+  url: string; // 関連URL（会社サイト・資料等）
   isSample: boolean;
   isStale: boolean;
 }
@@ -138,6 +139,9 @@ export interface MapNodeView {
   stakeholderId: string | null;
   kind: "hub" | "stakeholder" | "free";
   label: string | null; // kind<>'stakeholder' 用
+  imageUrl: string | null; // 写真（縮小済み data URL）
+  url: string | null; // 関連リンク
+  memo: string | null; // メモ
   x: number; // 0-1 比率座標
   y: number;
 }

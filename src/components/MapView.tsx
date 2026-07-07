@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { BaseView, Stakeholder, MapNodeView, MapEdgeView } from "@/lib/types";
 import {
+  addFreeMapNode,
   addMapEdge,
   deleteMapEdge,
+  deleteMapNode,
   ensureMapHub,
   moveMapNode,
   placeMapNode,
   resetMapForBase,
+  updateMapNodeMeta,
 } from "@/app/actions";
 
 // 内部表現。座標は 0-1 比率（解像度非依存・DB保存形式と同一）
@@ -20,6 +23,10 @@ interface MNode {
   sub: string;
   status: string | null;
   hub: boolean;
+  free: boolean; // 写真・付箋ノード
+  imageUrl: string | null;
+  url: string | null;
+  memo: string | null;
   x: number;
   y: number;
 }
@@ -34,6 +41,7 @@ interface MEdge {
 const H = 600;
 const ZONES: Record<string, [number, number]> = {
   オーナー候補: [0.1, 0.1],
+  企業会員候補: [0.4, 0.1],
   教育機関: [0.68, 0.12],
   "自治体・メディア": [0.12, 0.72],
   事務局: [0.68, 0.7],
@@ -67,6 +75,8 @@ export default function MapView({
   const [canvasW, setCanvasW] = useState(1100);
   const [centers, setCenters] = useState<Record<string, { x: number; y: number }>>({});
   const [tmpLine, setTmpLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [editNode, setEditNode] = useState<MNode | null>(null);
+  const [dropHint, setDropHint] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -109,6 +119,10 @@ export default function MapView({
           sub: "サテライト拠点",
           status: null,
           hub: true,
+          free: false,
+          imageUrl: null,
+          url: null,
+          memo: null,
           x: 0.42,
           y: 0.42,
         },
@@ -127,6 +141,10 @@ export default function MapView({
             sub: s.category + (s.isSample ? "（サンプル）" : ""),
             status: s.status,
             hub: false,
+            free: false,
+            imageUrl: null,
+            url: null,
+            memo: null,
             x: z[0] + ((cnt[s.category] % 2) * 195) / 1100,
             y: z[1] + (Math.floor(cnt[s.category] / 2) * 74) / H,
           });
@@ -151,10 +169,14 @@ export default function MapView({
             key: n.id,
             dbId: n.id,
             stakeholderId: n.stakeholderId,
-            label: n.kind === "hub" ? `NEO ${baseName}` : (sh?.name ?? n.label ?? "?"),
+            label: n.kind === "hub" ? `NEO ${baseName}` : (sh?.name ?? n.label ?? (n.imageUrl ? "" : "メモ")),
             sub: n.kind === "hub" ? "サテライト拠点" : (sh ? sh.category + (sh.isSample ? "（サンプル）" : "") : ""),
             status: sh?.status ?? null,
             hub: n.kind === "hub",
+            free: n.kind === "free",
+            imageUrl: n.imageUrl,
+            url: n.url ?? (sh?.url || null),
+            memo: n.memo,
             x: n.x,
             y: n.y,
           };
@@ -212,6 +234,104 @@ export default function MapView({
       y: Math.min(0.85, z[1] + jitter),
       actorName: recorderName,
     });
+  }
+
+  // 画像を最大320pxのJPEG data URLに縮小（DB保存・Realtime配信可能なサイズに）
+  async function fileToThumb(file: File): Promise<string> {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 320 / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * scale));
+    const h = Math.max(1, Math.round(bmp.height * scale));
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    cv.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
+    return cv.toDataURL("image/jpeg", 0.8);
+  }
+
+  // キャンバスへの写真ドラッグ&ドロップ → フリーノード作成
+  async function onCanvasDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDropHint(false);
+    const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+    const cr = canvasRef.current!.getBoundingClientRect();
+    const x = Math.max(0, Math.min(0.85, (e.clientX - cr.left) / cr.width));
+    const y = Math.max(0, Math.min(0.85, (e.clientY - cr.top) / cr.height));
+    let thumb: string;
+    try {
+      thumb = await fileToThumb(file);
+    } catch {
+      window.alert("画像の読み込みに失敗しました");
+      return;
+    }
+    const label = file.name.replace(/\.[^.]+$/, "");
+    if (usingSupabase) {
+      const res = await addFreeMapNode({
+        baseCode: activeBase,
+        x,
+        y,
+        label,
+        imageDataUrl: thumb,
+        actorName: recorderName,
+      });
+      if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
+    } else {
+      setNodes((prev) => {
+        const next = [
+          ...prev,
+          {
+            key: `f${Date.now()}`,
+            dbId: null,
+            stakeholderId: null,
+            label,
+            sub: "",
+            status: null,
+            hub: false,
+            free: true,
+            imageUrl: thumb,
+            url: null,
+            memo: null,
+            x,
+            y,
+          },
+        ];
+        persistMock(next, edges);
+        return next;
+      });
+    }
+  }
+
+  // ノードのメタ（ラベル・URL・メモ）保存
+  async function saveNodeMeta(n: MNode, f: { label: string; url: string; memo: string }) {
+    setNodes((prev) => {
+      const next = prev.map((x) =>
+        x.key === n.key ? { ...x, label: f.label || x.label, url: f.url || null, memo: f.memo || null } : x,
+      );
+      persistMock(next, edges);
+      return next;
+    });
+    setEditNode(null);
+    if (usingSupabase && n.dbId) {
+      await updateMapNodeMeta({
+        nodeId: n.dbId,
+        label: n.free ? f.label : undefined,
+        url: f.url,
+        memo: f.memo,
+        actorName: recorderName,
+      });
+    }
+  }
+
+  async function removeNode(n: MNode) {
+    setNodes((prev) => {
+      const next = prev.filter((x) => x.key !== n.key);
+      persistMock(next, edges.filter((e) => e.a !== n.key && e.b !== n.key));
+      return next;
+    });
+    setEdges((prev) => prev.filter((e) => e.a !== n.key && e.b !== n.key));
+    setEditNode(null);
+    if (usingSupabase && n.dbId) await deleteMapNode(n.dbId);
   }
 
   const onPointerDown = (e: React.PointerEvent, nodeKey: string, isPort: boolean) => {
@@ -357,7 +477,7 @@ export default function MapView({
         </button>
       </div>
       <div className="maphint">
-        カードをドラッグ＝移動 ／ カード右端の端子を別のカードへドラッグ＝線でつなぐ ／ 線をクリック＝削除
+        カードをドラッグ＝移動 ／ 端子ドラッグ＝線でつなぐ ／ 線クリック＝削除 ／ <b>写真をドロップ＝画像ノード追加</b> ／ <b>ダブルクリック＝URL・メモ編集</b>
         {usingSupabase
           ? " ／ 配置・接続は全員に共有されます（last-write-wins）"
           : " ／ モックモード：配置はこのセッション中のみ保持"}
@@ -374,7 +494,17 @@ export default function MapView({
         </div>
       )}
 
-      <div className="canvas" ref={canvasRef} style={{ touchAction: "none" }}>
+      <div
+        className="canvas"
+        ref={canvasRef}
+        style={{ touchAction: "none", outline: dropHint ? "3px dashed var(--pink)" : "none", outlineOffset: -3 }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDropHint(true);
+        }}
+        onDragLeave={() => setDropHint(false)}
+        onDrop={onCanvasDrop}
+      >
         <svg id="edges">
           {edges.map((e) => {
             const a = centers[e.a];
@@ -417,15 +547,36 @@ export default function MapView({
               ref={(el) => {
                 nodeRefs.current[n.key] = el;
               }}
-              className={`mnode${n.hub ? " mhub" : ""}`}
+              className={`mnode${n.hub ? " mhub" : ""}${n.imageUrl ? " mimg" : ""}`}
               style={{ left: n.x * canvasW, top: n.y * H }}
               onPointerDown={(e) => onPointerDown(e, n.key, false)}
+              onDoubleClick={() => !n.hub && setEditNode(n)}
+              title={n.hub ? undefined : "ダブルクリックで URL・メモを編集"}
             >
-              <b>{n.label}</b>
-              <small>
-                {n.sub}
-                {n.status ? ` ｜ ${n.status}` : ""}
-              </small>
+              {n.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={n.imageUrl} alt={n.label} draggable={false} />
+              )}
+              {n.label && <b>{n.label}</b>}
+              {(n.sub || n.status) && (
+                <small>
+                  {n.sub}
+                  {n.status ? ` ｜ ${n.status}` : ""}
+                </small>
+              )}
+              {n.memo && <small className="mmemo">📝 {n.memo}</small>}
+              {n.url && /^https?:\/\//.test(n.url) && (
+                <a
+                  className="mlink"
+                  href={n.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={n.url}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  ↗ リンク
+                </a>
+              )}
               {sc && <span className="msd" style={{ background: sc }} />}
               <span
                 className="mport"
@@ -436,6 +587,72 @@ export default function MapView({
           );
         })}
       </div>
+
+      {editNode && (
+        <NodeEditModal
+          node={editNode}
+          onSave={(f) => saveNodeMeta(editNode, f)}
+          onDelete={() => {
+            if (window.confirm(editNode.stakeholderId ? "マップから外しますか？（ステークホルダー自体は残り、未配置に戻ります）" : "このノードを削除しますか？")) {
+              void removeNode(editNode);
+            }
+          }}
+          onClose={() => setEditNode(null)}
+        />
+      )}
     </>
+  );
+}
+
+// ノードの URL・メモ・ラベル編集モーダル
+function NodeEditModal({
+  node,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  node: MNode;
+  onSave: (f: { label: string; url: string; memo: string }) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(node.label);
+  const [url, setUrl] = useState(node.url ?? "");
+  const [memo, setMemo] = useState(node.memo ?? "");
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="mhd">
+          <div>
+            <div className="mk">MAP NODE</div>
+            <h3>{node.stakeholderId ? node.label : "ノードを編集"}</h3>
+          </div>
+          <button className="x" onClick={onClose} aria-label="閉じる">×</button>
+        </div>
+        <div className="mbd">
+          {node.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={node.imageUrl} alt="" style={{ maxWidth: "100%", maxHeight: 160, display: "block", margin: "0 auto 10px", border: "1px solid var(--line)" }} />
+          )}
+          {node.free && (
+            <>
+              <label>ラベル</label>
+              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+            </>
+          )}
+          <label>URL</label>
+          <input type="text" value={url} placeholder="https://" onChange={(e) => setUrl(e.target.value)} />
+          <label>メモ</label>
+          <textarea value={memo} style={{ minHeight: 56 }} placeholder="例: 会食で名刺交換。次回は工場見学" onChange={(e) => setMemo(e.target.value)} />
+          <div className="mfoot">
+            <button className="save" onClick={() => onSave({ label, url, memo })}>保存</button>
+            <button className="cancel" style={{ borderColor: "var(--red)", color: "var(--red)" }} onClick={onDelete}>
+              {node.stakeholderId ? "マップから外す" : "削除"}
+            </button>
+            <button className="cancel" onClick={onClose}>キャンセル</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

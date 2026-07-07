@@ -84,6 +84,7 @@ export interface RawStakeholder {
   last_touched_on: string | null;
   next_action: string;
   next_action_due: string | null;
+  link?: string | null; // 関連URL
   is_sample: boolean;
 }
 export interface RawTriggerEvent {
@@ -129,6 +130,9 @@ export interface RawMapNode {
   stakeholder_id: string | null;
   kind: "hub" | "stakeholder" | "free";
   label: string | null;
+  image_url?: string | null;
+  url?: string | null;
+  memo?: string | null;
   x: number;
   y: number;
 }
@@ -218,6 +222,7 @@ export function buildDashboard(
       lastTouchedOn: s.last_touched_on,
       nextAction: s.next_action,
       nextActionDue: s.next_action_due,
+      url: s.link ?? "",
       isSample: s.is_sample,
       isStale: isStale(
         {
@@ -389,6 +394,9 @@ export function buildDashboard(
       stakeholderId: n.stakeholder_id,
       kind: n.kind,
       label: n.label,
+      imageUrl: n.image_url ?? null,
+      url: n.url ?? null,
+      memo: n.memo ?? null,
       x: Number(n.x),
       y: Number(n.y),
     })),

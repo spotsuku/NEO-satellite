@@ -169,11 +169,18 @@ create table if not exists map_nodes (
   stakeholder_id uuid references stakeholders(id),
   kind text not null default 'stakeholder' check (kind in ('hub','stakeholder','free')),
   label text,                                  -- kind <> 'stakeholder' 用
+  image_url text,                              -- 写真（縮小済み data URL または画像URL）
+  url text,                                    -- 関連リンク
+  memo text,                                   -- メモ
   x numeric not null, y numeric not null,      -- キャンバス比率座標（0-1）で保存し解像度非依存に
   updated_at timestamptz default now(),
   updated_by text,
   unique (base_id, stakeholder_id)
 );
+-- 既存DBへの追補（冪等）
+alter table map_nodes add column if not exists image_url text;
+alter table map_nodes add column if not exists url text;
+alter table map_nodes add column if not exists memo text;
 
 create table if not exists map_edges (
   id uuid primary key default gen_random_uuid(),

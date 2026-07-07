@@ -62,7 +62,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     db
       .from("stakeholders")
       .select(
-        "id,name,contact_name,title,commit_amount,approached_on,last_touched_on,next_action,next_action_due,is_sample,bases(code),categories(name,uses_amount),statuses(name)",
+        "id,name,contact_name,title,commit_amount,approached_on,last_touched_on,next_action,next_action_due,link,is_sample,bases(code),categories(name,uses_amount),statuses(name)",
       ),
     db
       .from("trigger_events")
@@ -72,7 +72,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       .select("state,bases(code),prep_role_defs(name,sort),stakeholders(name)"),
     db.from("fuel_metrics").select("metric,value,noted_on,bases(code)").order("noted_on", { ascending: false }),
     db.from("activities").select("*,bases(name)").order("created_at", { ascending: false }).limit(300),
-    db.from("map_nodes").select("id,stakeholder_id,kind,label,x,y,bases(code)"),
+    db.from("map_nodes").select("*,bases(code)"),
     db.from("map_edges").select("id,from_node,to_node,bases(code),rel_types(name)"),
     db.from("fuel_targets").select("metric,target,bases(code)"),
     db.from("app_settings").select("key,value"),
@@ -165,6 +165,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       last_touched_on: s.last_touched_on,
       next_action: s.next_action ?? "",
       next_action_due: s.next_action_due,
+      link: s.link,
       is_sample: s.is_sample ?? false,
     })),
     triggerEvents: ((triggerEvents.data ?? []) as any[]).map((e) => ({
@@ -199,6 +200,9 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       stakeholder_id: n.stakeholder_id,
       kind: n.kind,
       label: n.label,
+      image_url: n.image_url ?? null,
+      url: n.url ?? null,
+      memo: n.memo ?? null,
       x: Number(n.x),
       y: Number(n.y),
     })),
