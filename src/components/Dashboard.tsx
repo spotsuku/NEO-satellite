@@ -22,7 +22,7 @@ type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.6.0";
+export const APP_VERSION = "v0.6.1";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();

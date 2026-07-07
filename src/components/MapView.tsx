@@ -27,6 +27,7 @@ interface MNode {
   imageUrl: string | null;
   url: string | null;
   memo: string | null;
+  w: number | null; // ノード幅(px・画像ノード)
   x: number;
   y: number;
 }
@@ -84,6 +85,7 @@ export default function MapView({
   const hubEnsured = useRef<Set<string>>(new Set());
   const drag = useRef<{ key: string; dx: number; dy: number } | null>(null);
   const link = useRef<{ from: string } | null>(null);
+  const resize = useRef<{ key: string; startX: number; startW: number } | null>(null);
 
   const relColor = useCallback(
     (t: string) => relTypes.find((r) => r.name === t)?.color ?? "#00C0F0",
@@ -123,6 +125,7 @@ export default function MapView({
           imageUrl: null,
           url: null,
           memo: null,
+          w: null,
           x: 0.42,
           y: 0.42,
         },
@@ -145,6 +148,7 @@ export default function MapView({
             imageUrl: null,
             url: null,
             memo: null,
+            w: null,
             x: z[0] + ((cnt[s.category] % 2) * 195) / 1100,
             y: z[1] + (Math.floor(cnt[s.category] / 2) * 74) / H,
           });
@@ -177,6 +181,7 @@ export default function MapView({
             imageUrl: n.imageUrl,
             url: n.url ?? (sh?.url || null),
             memo: n.memo,
+            w: n.w,
             x: n.x,
             y: n.y,
           };
@@ -258,20 +263,24 @@ export default function MapView({
     const cr = canvasRef.current!.getBoundingClientRect();
     const x = Math.max(0, Math.min(0.85, (e.clientX - cr.left) / cr.width));
     const y = Math.max(0, Math.min(0.85, (e.clientY - cr.top) / cr.height));
+    await addImageNode(file, x, y);
+  }
+
+  // 画像ファイル → 画像ノード作成（ドロップ・貼り付け共通。ラベルは空＝あとで✎から）
+  async function addImageNode(file: File | Blob, x: number, y: number) {
     let thumb: string;
     try {
-      thumb = await fileToThumb(file);
+      thumb = await fileToThumb(file as File);
     } catch {
       window.alert("画像の読み込みに失敗しました");
       return;
     }
-    const label = file.name.replace(/\.[^.]+$/, "");
     if (usingSupabase) {
       const res = await addFreeMapNode({
         baseCode: activeBase,
         x,
         y,
-        label,
+        label: "",
         imageDataUrl: thumb,
         actorName: recorderName,
       });
@@ -284,7 +293,7 @@ export default function MapView({
             key: `f${Date.now()}`,
             dbId: null,
             stakeholderId: null,
-            label,
+            label: "",
             sub: "",
             status: null,
             hub: false,
@@ -292,6 +301,7 @@ export default function MapView({
             imageUrl: thumb,
             url: null,
             memo: null,
+            w: null,
             x,
             y,
           },
@@ -301,6 +311,25 @@ export default function MapView({
       });
     }
   }
+
+  // クリップボード貼り付け（⌘V / Ctrl+V）で画像ノード追加。
+  // 入力欄へのペーストは通常動作のまま。位置はキャンバス中央付近に少しずらして配置。
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && /INPUT|TEXTAREA|SELECT/.test(target.tagName)) return;
+      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
+      if (!item) return;
+      const file = item.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      const jitter = (nodes.length % 4) * 0.04;
+      void addImageNode(file, 0.4 + jitter, 0.3 + jitter);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBase, usingSupabase, nodes.length, edges]);
 
   // ノードのメタ（ラベル・URL・メモ）保存
   async function saveNodeMeta(n: MNode, f: { label: string; url: string; memo: string }) {
@@ -366,6 +395,12 @@ export default function MapView({
           ),
         );
       }
+      if (resize.current) {
+        const r0 = resize.current;
+        const w = Math.max(90, Math.min(520, r0.startW + (e.clientX - r0.startX)));
+        setNodes((prev) => prev.map((n) => (n.key === r0.key ? { ...n, w } : n)));
+        return;
+      }
       if (link.current) {
         const c = centers[link.current.from];
         if (c) setTmpLine({ x1: c.x, y1: c.y, x2: e.clientX - cr.left, y2: e.clientY - cr.top });
@@ -413,6 +448,15 @@ export default function MapView({
         const n = nodes.find((x) => x.key === key);
         if (n) {
           if (usingSupabase && n.dbId) void moveMapNode({ nodeId: n.dbId, x: n.x, y: n.y, actorName: recorderName });
+          else persistMock(nodes, edges);
+        }
+      }
+      if (resize.current) {
+        const key = resize.current.key;
+        resize.current = null;
+        const n = nodes.find((x) => x.key === key);
+        if (n) {
+          if (usingSupabase && n.dbId) void updateMapNodeMeta({ nodeId: n.dbId, w: n.w, actorName: recorderName });
           else persistMock(nodes, edges);
         }
       }
@@ -548,14 +592,23 @@ export default function MapView({
                 nodeRefs.current[n.key] = el;
               }}
               className={`mnode${n.hub ? " mhub" : ""}${n.imageUrl ? " mimg" : ""}`}
-              style={{ left: n.x * canvasW, top: n.y * H }}
+              style={{
+                left: n.x * canvasW,
+                top: n.y * H,
+                ...(n.imageUrl ? { width: n.w ?? 160, maxWidth: "none" } : {}),
+              }}
               onPointerDown={(e) => onPointerDown(e, n.key, false)}
               onDoubleClick={() => !n.hub && setEditNode(n)}
-              title={n.hub ? undefined : "ダブルクリックで URL・メモを編集"}
+              title={n.hub ? undefined : "✎ またはダブルクリックで URL・メモを編集"}
             >
               {n.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={n.imageUrl} alt={n.label} draggable={false} />
+                <img
+                  src={n.imageUrl}
+                  alt={n.label}
+                  draggable={false}
+                  style={{ maxHeight: Math.round(((n.w ?? 160) * 3) / 4) }}
+                />
               )}
               {n.label && <b>{n.label}</b>}
               {(n.sub || n.status) && (
@@ -578,6 +631,30 @@ export default function MapView({
                 </a>
               )}
               {sc && <span className="msd" style={{ background: sc }} />}
+              {!n.hub && (
+                <button
+                  className="medit"
+                  title="URL・メモを編集"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditNode(n);
+                  }}
+                >
+                  ✎
+                </button>
+              )}
+              {n.imageUrl && (
+                <span
+                  className="mresize"
+                  title="ドラッグでサイズ変更"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    resize.current = { key: n.key, startX: e.clientX, startW: n.w ?? 160 };
+                  }}
+                />
+              )}
               <span
                 className="mport"
                 title="ドラッグして別のカードへ"

@@ -172,6 +172,7 @@ create table if not exists map_nodes (
   image_url text,                              -- 写真（縮小済み data URL または画像URL）
   url text,                                    -- 関連リンク
   memo text,                                   -- メモ
+  w numeric,                                   -- ノード幅（px・画像ノードのリサイズ用）
   x numeric not null, y numeric not null,      -- キャンバス比率座標（0-1）で保存し解像度非依存に
   updated_at timestamptz default now(),
   updated_by text,
@@ -181,6 +182,7 @@ create table if not exists map_nodes (
 alter table map_nodes add column if not exists image_url text;
 alter table map_nodes add column if not exists url text;
 alter table map_nodes add column if not exists memo text;
+alter table map_nodes add column if not exists w numeric; -- ノード幅(px・画像ノードのリサイズ用)
 
 create table if not exists map_edges (
   id uuid primary key default gen_random_uuid(),

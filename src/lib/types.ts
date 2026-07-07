@@ -142,6 +142,7 @@ export interface MapNodeView {
   imageUrl: string | null; // 写真（縮小済み data URL）
   url: string | null; // 関連リンク
   memo: string | null; // メモ
+  w: number | null; // ノード幅(px)
   x: number; // 0-1 比率座標
   y: number;
 }

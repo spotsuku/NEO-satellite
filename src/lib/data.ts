@@ -203,6 +203,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       image_url: n.image_url ?? null,
       url: n.url ?? null,
       memo: n.memo ?? null,
+      w: n.w != null ? Number(n.w) : null,
       x: Number(n.x),
       y: Number(n.y),
     })),

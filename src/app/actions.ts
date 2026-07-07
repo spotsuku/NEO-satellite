@@ -451,6 +451,7 @@ export async function updateMapNodeMeta(input: {
   url?: string;
   memo?: string;
   imageDataUrl?: string | null;
+  w?: number | null;
   actorName: string;
 }): Promise<ActionResult> {
   if (input.imageDataUrl && input.imageDataUrl.length > 300_000)
@@ -462,6 +463,7 @@ export async function updateMapNodeMeta(input: {
   if (input.url !== undefined) patch.url = input.url || null;
   if (input.memo !== undefined) patch.memo = input.memo || null;
   if (input.imageDataUrl !== undefined) patch.image_url = input.imageDataUrl || null;
+  if (input.w !== undefined) patch.w = input.w;
   const { error } = await db.from("map_nodes").update(patch).eq("id", input.nodeId);
   if (error) return { ok: false, error: error.message };
   revalidatePath("/");

@@ -133,6 +133,7 @@ export interface RawMapNode {
   image_url?: string | null;
   url?: string | null;
   memo?: string | null;
+  w?: number | null;
   x: number;
   y: number;
 }
@@ -397,6 +398,7 @@ export function buildDashboard(
       imageUrl: n.image_url ?? null,
       url: n.url ?? null,
       memo: n.memo ?? null,
+      w: n.w != null ? Number(n.w) : null,
       x: Number(n.x),
       y: Number(n.y),
     })),
