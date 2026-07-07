@@ -236,6 +236,13 @@ tr.row:hover { background: var(--hover); }
 @media (max-width: 700px) { #cele .ct { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { #cele .cbar { animation-duration: .01s !important; } #cele .cmsg { animation-duration: .01s !important; } }
 
+/* ===== Kyushu launch map hero ===== */
+.kyushu-hero { border: 1px solid var(--ink); margin-bottom: 22px; background: var(--paper); }
+.kyushu-hero .kh-head { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.kyushu-hero .kh-toggle { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--gray); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; padding: 4px 12px; cursor: pointer; }
+.kyushu-hero .kh-toggle:hover { border-color: var(--ink); color: var(--ink); }
+.kyushu-hero svg { padding: 10px 0 14px; }
+
 /* ===== sugoroku step board（イラスト＋タイトル＋説明のマス）===== */
 .sugo { display: grid; grid-template-columns: repeat(8, 1fr); gap: 14px 18px; margin-bottom: 22px; }
 .sugo .sq { position: relative; border: 2px solid var(--ink); background: var(--paper); padding: 12px 10px 10px; text-align: center; cursor: pointer; transition: transform .12s; }

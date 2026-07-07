@@ -17,12 +17,14 @@ import MapView from "./MapView";
 import Celebration, { type CelebrationState } from "./Celebration";
 import TriggerRecordModal, { type RecordPayload } from "./TriggerRecordModal";
 import NameModal from "./NameModal";
+import KyushuMap from "./KyushuMap";
 
 type Tab = "board" | "stake" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
+const KYUSHU_KEY = "neo_kyushu_open_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.6.1";
+export const APP_VERSION = "v0.7.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -39,6 +41,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const [showName, setShowName] = useState(false);
   const [nameReady, setNameReady] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [kyushuOpen, setKyushuOpen] = useState(true);
   const pendingRecord = useRef<{ baseCode: string; initialCode: string } | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const recentLocal = useRef<Set<string>>(new Set());
@@ -50,7 +53,15 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     else setShowName(true);
     setNameReady(true);
     if (typeof window !== "undefined" && !window.localStorage.getItem(HINT_KEY)) setShowHint(true);
+    if (typeof window !== "undefined") setKyushuOpen(window.localStorage.getItem(KYUSHU_KEY) !== "0");
   }, []);
+
+  function toggleKyushu() {
+    setKyushuOpen((v) => {
+      window.localStorage.setItem(KYUSHU_KEY, v ? "0" : "1");
+      return !v;
+    });
+  }
 
   function dismissHint() {
     setShowHint(false);
@@ -344,6 +355,21 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
               <button className="hx" onClick={dismissHint} aria-label="閉じる">×</button>
             </div>
           )}
+          <div className="kyushu-hero">
+            <div className="kh-head">
+              <span className="en" style={{ fontSize: 10, letterSpacing: ".4em", color: "var(--gray)" }}>
+                KYUSHU LAUNCH MAP
+              </span>
+              <span style={{ fontSize: 11, color: "var(--gray)" }}>
+                県をクリックでその拠点の詳細へ ／ 黒塗り＝トリガー進捗
+              </span>
+              <button className="kh-toggle" onClick={toggleKyushu}>
+                {kyushuOpen ? "▲ たたむ" : "▼ 九州マップを開く"}
+              </button>
+            </div>
+            {kyushuOpen && <KyushuMap bases={data.bases} onSelectBase={selectBase} />}
+          </div>
+
           <Steps triggers={data.triggers} onInfo={setInfoTrigger} />
           <Legend />
           <BoardCards bases={data.bases} triggers={data.triggers} onSelectBase={selectBase} onDotClick={onDotClick} />
