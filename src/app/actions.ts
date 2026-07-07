@@ -102,6 +102,9 @@ export interface UpdateStakeholderInput {
   name?: string;
   contactName?: string;
   title?: string;
+  baseCode?: string; // 拠点の付け替え
+  category?: string; // カテゴリ変更
+  approachedOn?: string | null; // アプローチ日
   actorName: string;
 }
 
@@ -126,6 +129,19 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   }
   if (input.contactName !== undefined) patch.contact_name = input.contactName || null;
   if (input.title !== undefined) patch.title = input.title || null;
+  if (input.approachedOn !== undefined) patch.approached_on = input.approachedOn || null;
+  if (input.category !== undefined) {
+    const { data: cat } = await db.from("categories").select("id").eq("name", input.category).single();
+    if (!cat) return { ok: false, error: "カテゴリが見つかりません" };
+    patch.category_id = cat.id;
+  }
+  if (input.baseCode !== undefined) {
+    const { data: base } = await db.from("bases").select("id").eq("code", input.baseCode).single();
+    if (!base) return { ok: false, error: "拠点が見つかりません" };
+    patch.base_id = base.id;
+    // 拠点を移すと旧拠点のマップ配置は意味を失うのでノードを削除（エッジは cascade）
+    await db.from("map_nodes").delete().eq("stakeholder_id", input.id);
+  }
 
   const { error } = await db.from("stakeholders").update(patch).eq("id", input.id);
   if (error) return { ok: false, error: error.message };

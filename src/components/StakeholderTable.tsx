@@ -288,6 +288,20 @@ export default function StakeholderTable({
     if (title === s.title) return;
     await updateStakeholder({ id: s.id, title, actorName: recorderName });
   }
+  async function onBase(s: Stakeholder, baseCode: string) {
+    const base = bases.find((b) => b.code === baseCode);
+    patch(s.id, { baseCode, baseName: base?.name ?? baseCode });
+    await updateStakeholder({ id: s.id, baseCode, actorName: recorderName });
+  }
+  async function onCategory(s: Stakeholder, category: string) {
+    const usesAmount = categories.find((c) => c.name === category)?.usesAmount ?? false;
+    patch(s.id, { category, usesAmount });
+    await updateStakeholder({ id: s.id, category, actorName: recorderName });
+  }
+  async function onApproached(s: Stakeholder, approachedOn: string) {
+    patch(s.id, { approachedOn: approachedOn || null });
+    await updateStakeholder({ id: s.id, approachedOn: approachedOn || null, actorName: recorderName });
+  }
   async function onDelete(s: Stakeholder) {
     if (!window.confirm(`「${s.name}」を削除しますか？\n（マップ上のノード・準備室の紐付けも解除されます）`)) return;
     setDeleted((p) => new Set(p).add(s.id));
@@ -641,8 +655,32 @@ export default function StakeholderTable({
 
           {rows.map((s) => (
             <tr className="row" key={s.id}>
-              <td>{s.baseName}</td>
-              <td className="dim">{s.category}</td>
+              <td>
+                <select
+                  className="inline-input"
+                  value={s.baseCode}
+                  onChange={(e) => onBase(s, e.target.value)}
+                >
+                  {bases.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="dim">
+                <select
+                  className="inline-input"
+                  value={s.category}
+                  onChange={(e) => onCategory(s, e.target.value)}
+                >
+                  {categories.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </td>
               <td>
                 <input
                   key={`n-${s.id}-${s.name}`}
@@ -719,7 +757,14 @@ export default function StakeholderTable({
                   "—"
                 )}
               </td>
-              <td className="dim">{s.approachedOn ?? "—"}</td>
+              <td className="dim">
+                <input
+                  className="inline-input"
+                  type="date"
+                  value={s.approachedOn ?? ""}
+                  onChange={(e) => onApproached(s, e.target.value)}
+                />
+              </td>
               <td>
                 <input
                   className="inline-input"
