@@ -16,7 +16,7 @@ export const MOCK_BUNDLE: RawBundle = {
   triggers: [
     { code: "T1", name: "地域の紹介役合意", description: "顔役が事務局目線で紹介協力を合意", is_clock_start: true, auto_rule: null, sort: 1 },
     { code: "T2", name: "現地立上げ戦略会議", description: "関係者が自分ごと化する（飲み会）", is_clock_start: false, auto_rule: null, sort: 2 },
-    { code: "T3", name: "事務局リーダー確保", description: "地域の旗を振る若手人材", is_clock_start: false, auto_rule: null, sort: 3 },
+    { code: "T3", name: "事務局リーダー確定", description: "地域の旗を振る若手人材", is_clock_start: false, auto_rule: null, sort: 3 },
     { code: "T4", name: "準備室発足", description: "5ロール各1名以上で完成", is_clock_start: false, auto_rule: "prep_complete", sort: 4 },
     { code: "T5", name: "現地説明会", description: "地域に構想をお披露目", is_clock_start: false, auto_rule: null, sort: 5 },
     { code: "T6", name: "オーナー候補トップ会談", description: "経営者が出資検討者になる", is_clock_start: false, auto_rule: null, sort: 6 },

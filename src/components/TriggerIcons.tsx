@@ -34,7 +34,7 @@ export default function TriggerIcon({ code, accent }: { code: string; accent: st
           <circle cx="21" cy="7" r="1.6" {...a} />
         </svg>
       );
-    case "T3": // 事務局リーダー確保 — 旗を振る若手
+    case "T3": // 事務局リーダー確定 — 旗を振る若手
       return (
         <svg viewBox="0 0 32 32" width="44" height="44" aria-hidden>
           <circle cx="13" cy="12" r="4" {...s} />
