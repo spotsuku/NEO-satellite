@@ -105,7 +105,7 @@ export interface BaseView {
   triggersTotal: number;
   achievedCodes: string[]; // 成立済みトリガー code の配列
   clockStartIso: string | null; // T1 成立日
-  daysLeft: number | null; // T7 期限まで（マイナス=超過）
+  daysLeft: number | null; // 加盟金トリガー期限まで（マイナス=超過）
   deadlineLabel: string | null; // 'M/D'
   clockPct: number; // 経過率 0-100
   fuels: Fuels;
@@ -117,8 +117,8 @@ export interface BaseView {
   next: NextTrigger;
   history: TriggerLogEntry[];
   staleCount: number;
-  proposeT3: boolean; // 準備室5ロール確保 → T3 成立提案
-  proposeT7: boolean; // 確定 >= 目標 → T7 成立提案
+  proposePrep: boolean; // 準備室5ロール確保 → 準備室トリガー成立提案
+  proposeGoal: boolean; // 確定 >= 目標 → 加盟金トリガー成立提案
 }
 
 export interface ActivityItem {
@@ -167,6 +167,8 @@ export interface DashboardData {
   usingSupabase: boolean;
   today: string; // 'YYYY-MM-DD'（サーバ基準日）
   triggers: Trigger[];
+  prepTriggerCode: string; // auto_rule=prep_complete のトリガー（準備室）
+  goalTriggerCode: string; // auto_rule=goal_reached のトリガー（加盟金・90日期限の対象）
   statuses: StatusDef[];
   categories: { name: string; usesAmount: boolean }[];
   relTypes: { name: string; color: string }[];

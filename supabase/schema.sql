@@ -46,7 +46,7 @@ create table if not exists bases (
 
 create table if not exists triggers (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null,                   -- 'T1'〜'T8'
+  code text unique not null,                   -- 'T1'〜'T9'
   name text not null,                          -- '地域の紹介役合意'
   description text,                            -- 凡例帯の一言（誰がどう変わるか）
   criteria text,                               -- 成立条件（何が起きたら成立と記録するか）

@@ -92,8 +92,8 @@ export function applyTriggerEvent(data: DashboardData, p: AppliedTrigger): Dashb
         },
         ...b.history,
       ],
-      proposeT3: p.triggerCode === "T3" ? false : b.proposeT3,
-      proposeT7: p.triggerCode === "T7" ? false : b.proposeT7,
+      proposePrep: trg?.autoRule === "prep_complete" ? false : b.proposePrep,
+      proposeGoal: trg?.autoRule === "goal_reached" ? false : b.proposeGoal,
     };
   });
 

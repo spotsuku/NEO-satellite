@@ -202,6 +202,9 @@ export function buildDashboard(
 
   const catByName = new Map(raw.categories.map((c) => [c.name, c]));
   const clockTriggerCode = triggers.find((t) => t.isClockStart)?.code ?? "T1";
+  // 準備室・加盟金トリガーはコード直書きでなく auto_rule で特定（ステップ数の増減に追従）
+  const prepTriggerCode = triggers.find((t) => t.autoRule === "prep_complete")?.code ?? "T4";
+  const goalTriggerCode = triggers.find((t) => t.autoRule === "goal_reached")?.code ?? "T8";
   const triggersTotal = triggers.length;
 
   // ---- ステークホルダー（全社横断テーブル用）----
@@ -321,8 +324,8 @@ export function buildDashboard(
 
       const staleCount = stakeholders.filter((s) => s.baseCode === b.code && s.isStale).length;
 
-      const proposeT3 = prepSecured === prepTotal && !achievedCodes.includes("T3");
-      const proposeT7 = money.fixed >= b.goal_amount && !achievedCodes.includes("T7");
+      const proposePrep = prepSecured === prepTotal && !achievedCodes.includes(prepTriggerCode);
+      const proposeGoal = money.fixed >= b.goal_amount && !achievedCodes.includes(goalTriggerCode);
 
       return {
         id: b.id,
@@ -349,8 +352,8 @@ export function buildDashboard(
         next,
         history,
         staleCount,
-        proposeT3,
-        proposeT7,
+        proposePrep,
+        proposeGoal,
       } satisfies BaseView;
     });
 
@@ -382,6 +385,8 @@ export function buildDashboard(
     usingSupabase,
     today: todayIso,
     triggers,
+    prepTriggerCode,
+    goalTriggerCode,
     statuses,
     categories: raw.categories.map((c) => ({ name: c.name, usesAmount: c.uses_amount })),
     relTypes: raw.relTypes,

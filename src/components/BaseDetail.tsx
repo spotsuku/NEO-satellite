@@ -111,6 +111,9 @@ export default function BaseDetail({
   const m = base.money;
   const sh = stakeholders.filter((s) => s.baseCode === base.code);
   const nextT = triggers.find((t) => t.code === base.next.code);
+  // 準備室・加盟金トリガーのコード（ステップ数が変わっても auto_rule で追従）
+  const prepCode = triggers.find((t) => t.autoRule === "prep_complete")?.code ?? "T4";
+  const goalCode = triggers.find((t) => t.autoRule === "goal_reached")?.code ?? "T8";
   const statusColor = (name: string) => statuses.find((s) => s.name === name)?.color ?? "var(--gray)";
   const statusFilled = (name: string) => name !== "未アプローチ";
 
@@ -124,7 +127,7 @@ export default function BaseDetail({
         <span className="st">次のトリガー：{base.next.code} {base.next.name}</span>
         {base.daysLeft !== null && (
           <span className="st" style={{ color: base.daysLeft <= 30 ? "var(--red)" : "#fff" }}>
-            ⏱ T7期限 {base.deadlineLabel}（
+            ⏱ {goalCode}期限 {base.deadlineLabel}（
             {base.daysLeft >= 0 ? `残り${base.daysLeft}日` : `超過${-base.daysLeft}日`}）
           </span>
         )}
@@ -133,28 +136,28 @@ export default function BaseDetail({
         </button>
       </div>
 
-      {/* T3 / T7 成立提案バナー（自動成立はしない） */}
-      {base.proposeT3 && (
+      {/* 準備室 / 加盟金 成立提案バナー（自動成立はしない） */}
+      {base.proposePrep && (
         <div className="propose">
           <span className="pk">PROPOSAL</span>
           <div>
-            <div className="pt">T3 準備室発足の条件を満たしました</div>
+            <div className="pt">{prepCode} 準備室発足の条件を満たしました</div>
             <div className="ps">5ロールすべて「確保」。成立にしますか？（成立日・証拠の入力が必要です）</div>
           </div>
-          <button className="rec-btn solid" onClick={() => onRecord("T3")}>
-            T3成立を記録
+          <button className="rec-btn solid" onClick={() => onRecord(prepCode)}>
+            {prepCode}成立を記録
           </button>
         </div>
       )}
-      {base.proposeT7 && (
+      {base.proposeGoal && (
         <div className="propose">
           <span className="pk">PROPOSAL</span>
           <div>
-            <div className="pt">T7 加盟金{YEN(base.goalAmount)}万円を達成しました</div>
+            <div className="pt">{goalCode} 加盟金{YEN(base.goalAmount)}万円を達成しました</div>
             <div className="ps">確定合計が目標に到達。成立にしますか？（成立日・証拠の入力が必要です）</div>
           </div>
-          <button className="rec-btn solid" onClick={() => onRecord("T7")}>
-            T7成立を記録
+          <button className="rec-btn solid" onClick={() => onRecord(goalCode)}>
+            {goalCode}成立を記録
           </button>
         </div>
       )}

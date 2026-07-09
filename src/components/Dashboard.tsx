@@ -24,7 +24,7 @@ const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 const KYUSHU_KEY = "neo_kyushu_open_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.7.0";
+export const APP_VERSION = "v0.8.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -184,7 +184,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
     if (data.usingSupabase) router.refresh();
   }
 
-  // カードの T1〜T8 ドットクリック: モーダルで成立記録／成立済みなら取り消し
+  // カードの T1〜T9 ドットクリック: モーダルで成立記録／成立済みなら取り消し
   function onDotClick(baseCode: string, trigger: Trigger) {
     selectBase(baseCode);
     openRecord(baseCode, trigger.code);
@@ -348,9 +348,9 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
             <div className="hintbar">
               <div>
                 <b>使い方</b> — トリガーの成立/取り消しは手動で操作できます：
-                ① カードの<b>「✎ 成立を記録」</b>で次のトリガーを記録（T1〜T8のドットやNEXTバーのクリックでも可）
+                ① カードの<b>「✎ 成立を記録」</b>で次のトリガーを記録（T1〜T{data.triggers.length}のドットやNEXTバーのクリックでも可）
                 ② <b>「⟲ 状態を手動変更」</b>で詳細を開き、「トリガー状態」一覧から任意のトリガーを成立⇄取り消し（T2をT1に戻す等）
-                ③ 上の<b>ステップ帯（T1〜T8）をクリック</b>すると各トリガーの成立条件が見られます
+                ③ 上の<b>ステップ帯（T1〜T{data.triggers.length}）をクリック</b>すると各トリガーの成立条件が見られます
               </div>
               <button className="hx" onClick={dismissHint} aria-label="閉じる">×</button>
             </div>
@@ -371,7 +371,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           </div>
 
           <Steps triggers={data.triggers} onInfo={setInfoTrigger} />
-          <Legend />
+          <Legend total={data.triggers.length} />
           <BoardCards bases={data.bases} triggers={data.triggers} onSelectBase={selectBase} onDotClick={onDotClick} />
           <div ref={detailRef}>
             {selectedBase && (
@@ -392,8 +392,8 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
             )}
           </div>
           <div className="footnote">
-            トリガーイベント T1〜T8。T1の成立から3ヶ月以内にT7（加盟金3000万円達成）をやり切るのが立ち上げの基本ルール。
-            T3 準備室発足は5ロール（現地紹介者・オーナー企業候補・学生リーダー候補・大学高校関係者・自治体関係者）が各1名以上揃った時点で成立提案。
+            トリガーイベント T1〜T{data.triggers.length}。T1の成立から3ヶ月以内に{data.goalTriggerCode}（加盟金3000万円達成）をやり切るのが立ち上げの基本ルール。
+            {data.prepTriggerCode} 準備室発足は5ロール（現地紹介者・オーナー企業候補・学生リーダー候補・大学高校関係者・自治体関係者）が各1名以上揃った時点で成立提案。
             イベントは「開催」ではなく成立条件（相手から次のアクションが提案される等）を満たした時点で成立と記録します。
           </div>
         </section>

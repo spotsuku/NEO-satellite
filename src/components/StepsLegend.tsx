@@ -10,7 +10,7 @@ const ACCENTS = ["var(--yellow)", "var(--pink)", "var(--cyan)", "var(--green)"];
 export function Steps({ triggers, onInfo }: { triggers: Trigger[]; onInfo: (t: Trigger) => void }) {
   const last = triggers.length - 1;
   return (
-    <div className="sugo">
+    <div className="sugo" style={{ gridTemplateColumns: `repeat(${triggers.length || 8}, 1fr)` }}>
       {triggers.map((t, i) => {
         const accent = ACCENTS[i % ACCENTS.length];
         return (
@@ -38,7 +38,7 @@ export function Steps({ triggers, onInfo }: { triggers: Trigger[]; onInfo: (t: T
   );
 }
 
-export function Legend() {
+export function Legend({ total }: { total?: number }) {
   return (
     <div className="legend">
       <span>
@@ -53,7 +53,7 @@ export function Legend() {
         <span className="dot fut" />
         未到達
       </span>
-      <span style={{ color: "var(--gray)" }}>県の黒塗り＝トリガー進捗（成立数/8）</span>
+      <span style={{ color: "var(--gray)" }}>県の黒塗り＝トリガー進捗（成立数/{total ?? 9}）</span>
       <span style={{ marginLeft: "auto" }}>ステップ帯クリック＝成立条件 ／ カードのドット＝成立を記録</span>
     </div>
   );

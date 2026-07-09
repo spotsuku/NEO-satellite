@@ -67,6 +67,7 @@ export default function BoardCards({
   onSelectBase: (code: string) => void;
   onDotClick: (baseCode: string, trigger: Trigger) => void;
 }) {
+  const goalCode = triggers.find((t) => t.autoRule === "goal_reached")?.code ?? "T8";
   return (
     <div className="cards" id="board">
       {bases.map((b) => {
@@ -143,7 +144,7 @@ export default function BoardCards({
               <div className="ddl idle">⏱ T1成立で3ヶ月時計スタート</div>
             ) : (
               <div className="ddl">
-                <span>⏱ T7（{YEN(b.goalAmount)}万）期限 {b.deadlineLabel}</span>
+                <span>⏱ {goalCode}（{YEN(b.goalAmount)}万）期限 {b.deadlineLabel}</span>
                 <b style={{ color: warn ? "var(--red)" : "var(--ink)" }}>
                   {b.daysLeft >= 0 ? `残り${b.daysLeft}日` : `超過${-b.daysLeft}日`}
                 </b>

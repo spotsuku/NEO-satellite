@@ -1,7 +1,7 @@
 "use client";
 
 // 成立条件チェックリスト。「何をクリアすればいいか」を短い項目で示す。
-// base を渡すと T3（準備室5ロール）と T7（加盟金）は実データから自動でチェック状態を計算する。
+// base を渡すと準備室5ロール・加盟金のトリガー（auto_rule で判定）は実データから自動でチェック状態を計算する。
 
 import type { Trigger, BaseView } from "@/lib/types";
 import { YEN } from "@/lib/domain";
@@ -12,13 +12,13 @@ export interface CheckItem {
 }
 
 export function buildChecklist(trigger: Trigger, base?: BaseView | null): CheckItem[] {
-  if (base && trigger.code === "T3" && base.prep.length > 0) {
+  if (base && trigger.autoRule === "prep_complete" && base.prep.length > 0) {
     return base.prep.map((p) => ({
       label: `${p.roleName}を確保${p.stakeholderName && p.stakeholderName !== "—" ? `（${p.stakeholderName}）` : ""}`,
       done: p.state === "確保",
     }));
   }
-  if (base && trigger.code === "T7") {
+  if (base && trigger.autoRule === "goal_reached") {
     const items: CheckItem[] = [
       {
         label: `確定合計 ${YEN(base.money.fixed)} / ${YEN(base.goalAmount)}万円`,
