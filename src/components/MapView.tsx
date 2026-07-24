@@ -416,22 +416,35 @@ export default function MapView({
     }
   }
 
-  // 何もない場所のダブルクリック → その位置にテキストを挿入
+  // 入力中のテキストボックス（ボード上に直接置いてその場で入力）
+  const [draft, setDraft] = useState<{ x: number; y: number } | null>(null);
+
+  async function commitDraft(text: string) {
+    const d = draft;
+    setDraft(null);
+    if (d && text.trim()) await addTextNode(text, d.x, d.y);
+  }
+
+  // 何もない場所のダブルクリック → その位置に空のテキストボックスを配置
   function onCanvasDblClick(e: React.MouseEvent) {
     if ((e.target as HTMLElement).closest(".mnode")) return; // ノード上はノード編集に任せる
     const { wx, wy } = toWorld(e.clientX, e.clientY);
     const x = Math.max(0, Math.min(BOARD - 0.15, wx / canvasW));
     const y = Math.max(0, Math.min(BOARD - 0.1, wy / H));
-    const text = window.prompt("ボードに挿入するテキスト");
-    if (text) void addTextNode(text, x, y);
+    setDraft({ x, y });
   }
 
-  // 「＋ テキスト」ボタン（中央付近に少しずらして配置）
+  // 「＋ テキスト」ボタン: 見えている範囲の中央付近に空のテキストボックスを配置
   function addTextFromButton() {
-    const text = window.prompt("ボードに挿入するテキスト");
-    if (!text) return;
-    const jitter = (nodes.length % 4) * 0.04;
-    void addTextNode(text, 0.38 + jitter, 0.25 + jitter);
+    const cr = canvasRef.current?.getBoundingClientRect();
+    const v = vpRef.current;
+    const wx = cr ? (cr.width * 0.45 - v.tx) / v.k : canvasW * 0.4;
+    const wy = cr ? (H * 0.4 - v.ty) / v.k : H * 0.3;
+    const jitter = (nodes.length % 4) * 0.03;
+    setDraft({
+      x: Math.max(0, Math.min(BOARD - 0.15, wx / canvasW + jitter)),
+      y: Math.max(0, Math.min(BOARD - 0.1, wy / H + jitter)),
+    });
   }
 
   // 「📷 画像を追加」ボタン → ファイル選択（複数可）
@@ -844,6 +857,36 @@ export default function MapView({
             </div>
           );
         })}
+
+        {/* 入力中のテキストボックス（Enterで確定・Escで取消・空のままフォーカスを外すと消える） */}
+        {draft && (
+          <div
+            className="mnode"
+            style={{ left: draft.x * canvasW, top: draft.y * H, zIndex: 25, borderStyle: "dashed" }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <input
+              autoFocus
+              placeholder="テキストを入力…"
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontFamily: "inherit",
+                fontSize: 13,
+                fontWeight: 700,
+                width: 160,
+                padding: 0,
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return; // IME確定のEnterは無視
+                if (e.key === "Enter") void commitDraft((e.target as HTMLInputElement).value);
+                if (e.key === "Escape") setDraft(null);
+              }}
+              onBlur={(e) => void commitDraft(e.target.value)}
+            />
+          </div>
+        )}
         </div>
 
         {/* ズーム操作（右上・固定） */}
