@@ -21,6 +21,7 @@ interface MNode {
   stakeholderId: string | null;
   label: string;
   sub: string;
+  person: string | null; // 担当者名（ステークホルダーの氏名）
   status: string | null;
   hub: boolean;
   free: boolean; // 写真・付箋ノード
@@ -40,6 +41,10 @@ interface MEdge {
 }
 
 const H = 600;
+// ボードの論理サイズ＝表示枠の BOARD 倍（ズームアウト・パンで広い範囲を使える）
+const BOARD = 2;
+const MIN_ZOOM = 0.35;
+const MAX_ZOOM = 2.5;
 const ZONES: Record<string, [number, number]> = {
   オーナー候補: [0.1, 0.1],
   企業会員候補: [0.4, 0.1],
@@ -78,6 +83,11 @@ export default function MapView({
   const [tmpLine, setTmpLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const [editNode, setEditNode] = useState<MNode | null>(null);
   const [dropHint, setDropHint] = useState(false);
+  // ビューポート（Figma風ズーム＆パン）: 画面座標 = ワールド座標 * k + (tx, ty)
+  const [vp, setVp] = useState({ k: 1, tx: 0, ty: 0 });
+  const vpRef = useRef(vp);
+  vpRef.current = vp;
+  const pan = useRef<{ sx: number; sy: number; tx0: number; ty0: number } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -96,6 +106,56 @@ export default function MapView({
     [statuses],
   );
   const baseName = bases.find((b) => b.code === activeBase)?.name ?? "";
+
+  // ズーム倍率とパン量をボードが枠から離れない範囲にクランプ
+  const clampVp = useCallback((k: number, tx: number, ty: number, frameW: number) => {
+    const kk = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
+    const worldW = frameW * BOARD * kk;
+    const worldH = H * BOARD * kk;
+    const loX = Math.min(0, frameW - worldW);
+    const hiX = Math.max(0, frameW - worldW);
+    const loY = Math.min(0, H - worldH);
+    const hiY = Math.max(0, H - worldH);
+    return { k: kk, tx: Math.max(loX, Math.min(hiX, tx)), ty: Math.max(loY, Math.min(hiY, ty)) };
+  }, []);
+
+  // 画面座標 → ワールド座標（px）
+  const toWorld = useCallback((clientX: number, clientY: number) => {
+    const cr = canvasRef.current!.getBoundingClientRect();
+    const v = vpRef.current;
+    return { wx: (clientX - cr.left - v.tx) / v.k, wy: (clientY - cr.top - v.ty) / v.k };
+  }, []);
+
+  // ±ボタン: 枠中央を基準にズーム
+  const zoomBy = useCallback(
+    (f: number) => {
+      const cr = canvasRef.current?.getBoundingClientRect();
+      if (!cr) return;
+      const v = vpRef.current;
+      const k2 = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.k * f));
+      const cx = cr.width / 2;
+      const cy = H / 2;
+      setVp(clampVp(k2, cx - ((cx - v.tx) * k2) / v.k, cy - ((cy - v.ty) * k2) / v.k, cr.width));
+    },
+    [clampVp],
+  );
+
+  // ホイール／トラックパッドでカーソル位置基準のズーム（ページスクロールは抑止）
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const cr = cv.getBoundingClientRect();
+      const v = vpRef.current;
+      const k2 = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.k * Math.exp(-e.deltaY * 0.0015)));
+      const cx = e.clientX - cr.left;
+      const cy = e.clientY - cr.top;
+      setVp(clampVp(k2, cx - ((cx - v.tx) * k2) / v.k, cy - ((cy - v.ty) * k2) / v.k, cr.width));
+    };
+    cv.addEventListener("wheel", onWheel, { passive: false });
+    return () => cv.removeEventListener("wheel", onWheel);
+  }, [clampVp]);
 
   // キャンバス幅を測定
   useLayoutEffect(() => {
@@ -119,6 +179,7 @@ export default function MapView({
           stakeholderId: null,
           label: `NEO ${b?.name ?? ""}`,
           sub: "サテライト拠点",
+          person: null,
           status: null,
           hub: true,
           free: false,
@@ -142,6 +203,7 @@ export default function MapView({
             stakeholderId: s.id,
             label: s.name.replace("（リスト作成中）", "リスト作成中"),
             sub: s.category + (s.isSample ? "（サンプル）" : ""),
+            person: s.contactName && s.contactName !== "—" ? s.contactName : null,
             status: s.status,
             hub: false,
             free: false,
@@ -175,6 +237,7 @@ export default function MapView({
             stakeholderId: n.stakeholderId,
             label: n.kind === "hub" ? `NEO ${baseName}` : (sh?.name ?? n.label ?? (n.imageUrl ? "" : "メモ")),
             sub: n.kind === "hub" ? "サテライト拠点" : (sh ? sh.category + (sh.isSample ? "（サンプル）" : "") : ""),
+            person: sh?.contactName && sh.contactName !== "—" ? sh.contactName : null,
             status: sh?.status ?? null,
             hub: n.kind === "hub",
             free: n.kind === "free",
@@ -209,12 +272,17 @@ export default function MapView({
     const cv = canvasRef.current;
     if (!cv) return;
     const cr = cv.getBoundingClientRect();
+    const v = vpRef.current;
     const next: Record<string, { x: number; y: number }> = {};
     for (const n of nodes) {
       const el = nodeRefs.current[n.key];
       if (!el) continue;
       const r = el.getBoundingClientRect();
-      next[n.key] = { x: r.left - cr.left + r.width / 2, y: r.top - cr.top + r.height / 2 };
+      // ワールド座標（ズーム・パン不変）で保持し、SVGはワールド内に描く
+      next[n.key] = {
+        x: (r.left - cr.left - v.tx + r.width / 2) / v.k,
+        y: (r.top - cr.top - v.ty + r.height / 2) / v.k,
+      };
     }
     setCenters(next);
   }, [nodes, canvasW]);
@@ -260,9 +328,9 @@ export default function MapView({
     setDropHint(false);
     const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"));
     if (!file) return;
-    const cr = canvasRef.current!.getBoundingClientRect();
-    const x = Math.max(0, Math.min(0.85, (e.clientX - cr.left) / cr.width));
-    const y = Math.max(0, Math.min(0.85, (e.clientY - cr.top) / cr.height));
+    const { wx, wy } = toWorld(e.clientX, e.clientY);
+    const x = Math.max(0, Math.min(BOARD - 0.15, wx / canvasW));
+    const y = Math.max(0, Math.min(BOARD - 0.1, wy / H));
     await addImageNode(file, x, y);
   }
 
@@ -295,6 +363,7 @@ export default function MapView({
             stakeholderId: null,
             label: "",
             sub: "",
+            person: null,
             status: null,
             hub: false,
             free: true,
@@ -309,6 +378,70 @@ export default function MapView({
         persistMock(next, edges);
         return next;
       });
+    }
+  }
+
+  // テキストノード（付箋）をボード上に直接追加
+  async function addTextNode(label: string, x: number, y: number) {
+    const text = label.trim();
+    if (!text) return;
+    if (usingSupabase) {
+      const res = await addFreeMapNode({ baseCode: activeBase, x, y, label: text, actorName: recorderName });
+      if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
+    } else {
+      setNodes((prev) => {
+        const next = [
+          ...prev,
+          {
+            key: `t${Date.now()}`,
+            dbId: null,
+            stakeholderId: null,
+            label: text,
+            sub: "",
+            person: null,
+            status: null,
+            hub: false,
+            free: true,
+            imageUrl: null,
+            url: null,
+            memo: null,
+            w: null,
+            x,
+            y,
+          },
+        ];
+        persistMock(next, edges);
+        return next;
+      });
+    }
+  }
+
+  // 何もない場所のダブルクリック → その位置にテキストを挿入
+  function onCanvasDblClick(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest(".mnode")) return; // ノード上はノード編集に任せる
+    const { wx, wy } = toWorld(e.clientX, e.clientY);
+    const x = Math.max(0, Math.min(BOARD - 0.15, wx / canvasW));
+    const y = Math.max(0, Math.min(BOARD - 0.1, wy / H));
+    const text = window.prompt("ボードに挿入するテキスト");
+    if (text) void addTextNode(text, x, y);
+  }
+
+  // 「＋ テキスト」ボタン（中央付近に少しずらして配置）
+  function addTextFromButton() {
+    const text = window.prompt("ボードに挿入するテキスト");
+    if (!text) return;
+    const jitter = (nodes.length % 4) * 0.04;
+    void addTextNode(text, 0.38 + jitter, 0.25 + jitter);
+  }
+
+  // 「📷 画像を追加」ボタン → ファイル選択（複数可）
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  async function onFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+    e.target.value = ""; // 同じファイルを続けて選べるように
+    for (let i = 0; i < files.length; i++) {
+      const jitter = ((nodes.length + i) % 4) * 0.05;
+      await addImageNode(files[i], 0.35 + jitter, 0.25 + jitter);
     }
   }
 
@@ -370,10 +503,9 @@ export default function MapView({
       link.current = { from: nodeKey };
       return;
     }
-    const cv = canvasRef.current!;
-    const cr = cv.getBoundingClientRect();
     const n = nodes.find((x) => x.key === nodeKey)!;
-    drag.current = { key: nodeKey, dx: e.clientX - cr.left - n.x * cr.width, dy: e.clientY - cr.top - n.y * cr.height };
+    const { wx, wy } = toWorld(e.clientX, e.clientY);
+    drag.current = { key: nodeKey, dx: wx - n.x * canvasW, dy: wy - n.y * H };
   };
 
   useEffect(() => {
@@ -381,15 +513,23 @@ export default function MapView({
       const cv = canvasRef.current;
       if (!cv) return;
       const cr = cv.getBoundingClientRect();
+      const v = vpRef.current;
+      if (pan.current) {
+        const p = pan.current;
+        setVp(clampVp(v.k, p.tx0 + (e.clientX - p.sx), p.ty0 + (e.clientY - p.sy), cr.width));
+        return;
+      }
       if (drag.current) {
         const d = drag.current;
+        const wx = (e.clientX - cr.left - v.tx) / v.k;
+        const wy = (e.clientY - cr.top - v.ty) / v.k;
         setNodes((prev) =>
           prev.map((n) =>
             n.key === d.key
               ? {
                   ...n,
-                  x: Math.max(0, Math.min((cr.width - 140) / cr.width, (e.clientX - cr.left - d.dx) / cr.width)),
-                  y: Math.max(0, Math.min((cr.height - 54) / cr.height, (e.clientY - cr.top - d.dy) / cr.height)),
+                  x: Math.max(0, Math.min((cr.width * BOARD - 150) / cr.width, (wx - d.dx) / cr.width)),
+                  y: Math.max(0, Math.min((H * BOARD - 60) / H, (wy - d.dy) / H)),
                 }
               : n,
           ),
@@ -397,19 +537,22 @@ export default function MapView({
       }
       if (resize.current) {
         const r0 = resize.current;
-        const w = Math.max(90, Math.min(520, r0.startW + (e.clientX - r0.startX)));
+        const w = Math.max(90, Math.min(520, r0.startW + (e.clientX - r0.startX) / v.k));
         setNodes((prev) => prev.map((n) => (n.key === r0.key ? { ...n, w } : n)));
         return;
       }
       if (link.current) {
         const c = centers[link.current.from];
-        if (c) setTmpLine({ x1: c.x, y1: c.y, x2: e.clientX - cr.left, y2: e.clientY - cr.top });
+        const wx = (e.clientX - cr.left - v.tx) / v.k;
+        const wy = (e.clientY - cr.top - v.ty) / v.k;
+        if (c) setTmpLine({ x1: c.x, y1: c.y, x2: wx, y2: wy });
         cv.querySelectorAll(".mnode").forEach((n) => n.classList.remove("linktarget"));
         const tgt = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(".mnode");
         if (tgt && (tgt as HTMLElement).dataset.id !== link.current.from) tgt.classList.add("linktarget");
       }
     };
     const up = (e: PointerEvent) => {
+      if (pan.current) pan.current = null;
       if (link.current) {
         const from = link.current.from;
         const tgt = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(
@@ -516,12 +659,26 @@ export default function MapView({
             ))}
           </span>
         </div>
-        <button className="mreset" onClick={resetMap}>
+        <button className="mreset" onClick={addTextFromButton} title="ボード上にテキスト（付箋）を追加">
+          ＋ テキスト
+        </button>
+        <button className="mreset" style={{ marginLeft: 0 }} onClick={() => fileInputRef.current?.click()} title="ファイルを選択して画像を追加">
+          📷 画像を追加
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={onFilesPicked}
+        />
+        <button className="mreset" style={{ marginLeft: 0 }} onClick={resetMap}>
           配置リセット
         </button>
       </div>
       <div className="maphint">
-        カードをドラッグ＝移動 ／ 端子ドラッグ＝線でつなぐ ／ 線クリック＝削除 ／ <b>写真をドロップ＝画像ノード追加</b> ／ <b>ダブルクリック＝URL・メモ編集</b>
+        カードをドラッグ＝移動 ／ 端子ドラッグ＝線でつなぐ ／ 線クリック＝削除 ／ <b>画像＝📷ボタン・ドロップ・⌘V</b> ／ <b>テキスト＝＋ボタンか空白をダブルクリック</b> ／ <b>空白ドラッグ＝ボード移動・ホイール＝ズーム</b> ／ カードのダブルクリック＝URL・メモ編集
         {usingSupabase
           ? " ／ 配置・接続は全員に共有されます（last-write-wins）"
           : " ／ モックモード：配置はこのセッション中のみ保持"}
@@ -541,14 +698,37 @@ export default function MapView({
       <div
         className="canvas"
         ref={canvasRef}
-        style={{ touchAction: "none", outline: dropHint ? "3px dashed var(--pink)" : "none", outlineOffset: -3 }}
+        style={{
+          touchAction: "none",
+          outline: dropHint ? "3px dashed var(--pink)" : "none",
+          outlineOffset: -3,
+          cursor: "grab",
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setDropHint(true);
         }}
         onDragLeave={() => setDropHint(false)}
         onDrop={onCanvasDrop}
+        onDoubleClick={onCanvasDblClick}
+        onPointerDown={(e) => {
+          // ノード外のドラッグ＝ボード全体のパン
+          if ((e.target as HTMLElement).closest(".mnode")) return;
+          pan.current = { sx: e.clientX, sy: e.clientY, tx0: vpRef.current.tx, ty0: vpRef.current.ty };
+        }}
       >
+        <div
+          className="mworld"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: canvasW * BOARD,
+            height: H * BOARD,
+            transform: `translate(${vp.tx}px, ${vp.ty}px) scale(${vp.k})`,
+            transformOrigin: "0 0",
+          }}
+        >
         <svg id="edges">
           {edges.map((e) => {
             const a = centers[e.a];
@@ -611,10 +791,11 @@ export default function MapView({
                 />
               )}
               {n.label && <b>{n.label}</b>}
-              {(n.sub || n.status) && (
-                <small>
+              {(n.sub || n.person || n.status) && (
+                <small title={n.status ? `ステータス: ${n.status}` : undefined}>
                   {n.sub}
-                  {n.status ? ` ｜ ${n.status}` : ""}
+                  {/* ステータス欄には担当者名を優先表示（未設定時はステータス） */}
+                  {n.person ? ` ｜ ${n.person}` : n.status ? ` ｜ ${n.status}` : ""}
                 </small>
               )}
               {n.memo && <small className="mmemo">📝 {n.memo}</small>}
@@ -663,6 +844,15 @@ export default function MapView({
             </div>
           );
         })}
+        </div>
+
+        {/* ズーム操作（右上・固定） */}
+        <div className="mzoom" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+          <button onClick={() => zoomBy(1 / 1.25)} title="ズームアウト">−</button>
+          <span>{Math.round(vp.k * 100)}%</span>
+          <button onClick={() => zoomBy(1.25)} title="ズームイン">＋</button>
+          <button onClick={() => setVp({ k: 1, tx: 0, ty: 0 })} title="等倍に戻す">⟲</button>
+        </div>
       </div>
 
       {editNode && (

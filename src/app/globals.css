@@ -174,6 +174,12 @@ tr.row:hover { background: var(--hover); }
 .mreset { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--gray); font-family: 'Noto Sans JP', sans-serif; font-size: 11px; padding: 5px 12px; cursor: pointer; }
 .mreset:hover { border-color: var(--ink); color: var(--ink); }
 .maphint { font-size: 11px; color: var(--gray); margin-bottom: 12px; }
+/* Figma風ズーム操作（キャンバス右上に固定・パンの影響を受けない） */
+.mzoom { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 2px;
+  background: var(--paper); border: 1px solid var(--ink); padding: 2px 4px; z-index: 30; }
+.mzoom button { background: none; border: none; font-size: 14px; width: 26px; height: 24px; cursor: pointer; color: var(--ink); line-height: 1; }
+.mzoom button:hover { background: #EFEFEA; }
+.mzoom span { font-size: 10px; font-weight: 700; font-family: 'Montserrat', sans-serif; min-width: 38px; text-align: center; }
 .canvas { position: relative; height: 600px; border: 1px solid var(--ink); overflow: hidden; touch-action: none;
   background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 22px 22px; }
 #edges { position: absolute; inset: 0; width: 100%; height: 100%; }
