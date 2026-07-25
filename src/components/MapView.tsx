@@ -92,6 +92,8 @@ export default function MapView({
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const mockCache = useRef<Record<string, { nodes: MNode[]; edges: MEdge[] }>>({});
+  // 追加直後の楽観表示用ノード（DBの本物が届くまでの間だけ保持。ラグでの点滅防止）
+  const pendingFree = useRef<{ base: string; node: MNode }[]>([]);
   const hubEnsured = useRef<Set<string>>(new Set());
   const drag = useRef<{ key: string; dx: number; dy: number } | null>(null);
   const link = useRef<{ from: string } | null>(null);
@@ -249,7 +251,11 @@ export default function MapView({
             y: n.y,
           };
         });
-      setNodes(ns);
+      // 楽観ノード: DBに本物が現れたら破棄、まだなら残して点滅を防ぐ
+      pendingFree.current = pendingFree.current.filter(
+        (t) => !(t.node.dbId && ns.some((n) => n.key === t.node.dbId)),
+      );
+      setNodes([...ns, ...pendingFree.current.filter((t) => t.base === activeBase).map((t) => t.node)]);
       setEdges(
         mapEdges
           .filter((e) => e.baseCode === activeBase)
@@ -344,15 +350,7 @@ export default function MapView({
       return;
     }
     if (usingSupabase) {
-      const res = await addFreeMapNode({
-        baseCode: activeBase,
-        x,
-        y,
-        label: "",
-        imageDataUrl: thumb,
-        actorName: recorderName,
-      });
-      if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
+      await addFreeOptimistic({ label: "", imageUrl: thumb }, x, y);
     } else {
       setNodes((prev) => {
         const next = [
@@ -381,13 +379,52 @@ export default function MapView({
     }
   }
 
+  // フリーノード（テキスト/画像）の楽観追加: 即ローカル表示 → サーバー保存 → 本物が届いたら差し替え
+  async function addFreeOptimistic(fields: { label: string; imageUrl: string | null }, x: number, y: number) {
+    const temp: MNode = {
+      key: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      dbId: null,
+      stakeholderId: null,
+      label: fields.label,
+      sub: "",
+      person: null,
+      status: null,
+      hub: false,
+      free: true,
+      imageUrl: fields.imageUrl,
+      url: null,
+      memo: null,
+      w: null,
+      x,
+      y,
+    };
+    const entry = { base: activeBase, node: temp };
+    pendingFree.current.push(entry);
+    setNodes((prev) => [...prev, temp]);
+    const res = await addFreeMapNode({
+      baseCode: activeBase,
+      x,
+      y,
+      label: fields.label,
+      imageDataUrl: fields.imageUrl,
+      actorName: recorderName,
+    });
+    if (!res.ok) {
+      pendingFree.current = pendingFree.current.filter((t) => t !== entry);
+      setNodes((prev) => prev.filter((n) => n.key !== temp.key));
+      window.alert(res.error ?? "追加に失敗しました");
+    } else if (res.nodeId) {
+      // 本物のidを控えておき、propsに現れた時点でsync側が楽観ノードを破棄する
+      temp.dbId = res.nodeId;
+    }
+  }
+
   // テキストノード（付箋）をボード上に直接追加
   async function addTextNode(label: string, x: number, y: number) {
     const text = label.trim();
     if (!text) return;
     if (usingSupabase) {
-      const res = await addFreeMapNode({ baseCode: activeBase, x, y, label: text, actorName: recorderName });
-      if (!res.ok) window.alert(res.error ?? "追加に失敗しました");
+      await addFreeOptimistic({ label: text, imageUrl: null }, x, y);
     } else {
       setNodes((prev) => {
         const next = [
