@@ -61,9 +61,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
     db.from("rel_types").select("name,color").order("sort"),
     db
       .from("stakeholders")
-      .select(
-        "id,name,contact_name,title,commit_amount,approached_on,last_touched_on,next_action,next_action_due,link,is_sample,bases(code),categories(name,uses_amount),statuses(name)",
-      ),
+      .select("*,bases(code),categories(name,uses_amount),statuses(name)"),
     db
       .from("trigger_events")
       .select("achieved_on,participants,evidence,recorded_by,bases(code),triggers(code)"),
@@ -166,6 +164,8 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       next_action: s.next_action ?? "",
       next_action_due: s.next_action_due,
       link: s.link,
+      minutes: s.minutes ?? null,
+      action_log: s.action_log ?? null,
       is_sample: s.is_sample ?? false,
     })),
     triggerEvents: ((triggerEvents.data ?? []) as any[]).map((e) => ({

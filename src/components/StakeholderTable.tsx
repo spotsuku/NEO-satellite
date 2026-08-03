@@ -14,6 +14,58 @@ import type { StatusName } from "@/lib/types";
 
 const ALL = "すべて";
 
+// 内容に合わせて高さが伸びるテキストエリア用（refとonInputの両方から呼ぶ）
+function autoGrow(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${Math.max(44, el.scrollHeight + 2)}px`;
+}
+
+// 複数行セル: 値の変化（初期表示・Realtime更新含む）で高さを追従させる
+function GrowArea({
+  value,
+  ...props
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => autoGrow(ref.current), [value]);
+  // 初期レイアウト確定前は列幅が違い高さ計算がずれるため、幅の変化にも追従させる
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => autoGrow(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      className="inline-input"
+      rows={2}
+      value={value}
+      onInput={(e) => autoGrow(e.currentTarget)}
+      {...props}
+    />
+  );
+}
+
+// 議事録セルの下に出すリンク（1行1URL → 📄1 📄2 …）
+function MinuteLinks({ text }: { text: string }) {
+  const urls = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((u) => /^https?:\/\//.test(u));
+  if (urls.length === 0) return null;
+  return (
+    <div className="mlinks">
+      {urls.map((u, i) => (
+        <a key={i} href={u} target="_blank" rel="noreferrer" title={u}>
+          📄{i + 1}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function AddModal({
   bases,
   categories,
@@ -85,6 +137,8 @@ function AddModal({
       nextAction,
       nextActionDue: null,
       url,
+      minutes: "",
+      actionLog: "",
       isSample: false,
       isStale: false,
     });
@@ -277,6 +331,16 @@ export default function StakeholderTable({
     patch(s.id, { nextAction });
     await updateStakeholder({ id: s.id, nextAction, actorName: recorderName });
   }
+  async function onActionLog(s: Stakeholder, actionLog: string) {
+    if (actionLog === s.actionLog) return;
+    patch(s.id, { actionLog });
+    await updateStakeholder({ id: s.id, actionLog, actorName: recorderName });
+  }
+  async function onMinutes(s: Stakeholder, minutes: string) {
+    if (minutes === s.minutes) return;
+    patch(s.id, { minutes });
+    await updateStakeholder({ id: s.id, minutes, actorName: recorderName });
+  }
   async function onAmount(s: Stakeholder, raw: string) {
     const commitAmount = raw === "" ? null : Number(raw);
     patch(s.id, { commitAmount });
@@ -351,6 +415,8 @@ export default function StakeholderTable({
       nextAction: r.nextAction ?? "",
       nextActionDue: null,
       url: r.url ?? "",
+      minutes: "",
+      actionLog: "",
       isSample: false,
       isStale: false,
     };
@@ -452,9 +518,10 @@ export default function StakeholderTable({
     setTimeout(() => setPasteMsg(null), 4000);
   }
 
-  // 表示中の行をスプレッドシート形式（TSV）でコピー
+  // 表示中の行をスプレッドシート形式（TSV）でコピー（複数行セルは「 / 」に畳む）
   async function copyTsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "URL"];
+    const flat = (v: string) => v.replace(/\r?\n/g, " / ");
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "URL"];
     const lines = rows.map((s) =>
       [
         s.baseName,
@@ -465,7 +532,9 @@ export default function StakeholderTable({
         s.status,
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
-        s.nextAction,
+        flat(s.nextAction),
+        flat(s.actionLog),
+        flat(s.minutes),
         s.url,
       ].join("\t"),
     );
@@ -475,7 +544,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "URL"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -488,6 +557,8 @@ export default function StakeholderTable({
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
         s.nextAction,
+        s.actionLog,
+        s.minutes,
         s.url,
       ]
         .map((v) => esc(String(v)))
@@ -534,19 +605,22 @@ export default function StakeholderTable({
         <button onClick={exportCsv}>CSVエクスポート</button>
       </div>
 
-      <table>
+      <div style={{ overflowX: "auto" }}>
+      <table style={{ minWidth: 1560 }}>
         <thead>
           <tr>
-            <th>拠点</th>
-            <th>カテゴリ</th>
-            <th>所属</th>
-            <th>氏名</th>
-            <th>役職</th>
-            <th>ステータス</th>
-            <th style={{ textAlign: "right" }}>金額(万)</th>
-            <th>アプローチ日</th>
-            <th>次回アクション</th>
-            <th style={{ width: 150 }}>URL</th>
+            <th style={{ minWidth: 64 }}>拠点</th>
+            <th style={{ minWidth: 96 }}>カテゴリ</th>
+            <th style={{ minWidth: 150 }}>所属</th>
+            <th style={{ minWidth: 84 }}>氏名</th>
+            <th style={{ minWidth: 76 }}>役職</th>
+            <th style={{ minWidth: 100 }}>ステータス</th>
+            <th style={{ textAlign: "right", minWidth: 70 }}>金額(万)</th>
+            <th style={{ minWidth: 106 }}>アプローチ日</th>
+            <th style={{ minWidth: 170 }}>次回アクション</th>
+            <th style={{ minWidth: 170 }}>アクションログ</th>
+            <th style={{ minWidth: 160 }}>議事録</th>
+            <th style={{ width: 130 }}>URL</th>
             <th style={{ width: 40 }} />
           </tr>
         </thead>
@@ -649,6 +723,8 @@ export default function StakeholderTable({
                 onKeyDown={onDraftEnter}
               />
             </td>
+            <td className="dim">—</td>
+            <td className="dim">—</td>
             <td>
               <input
                 className="inline-input"
@@ -792,10 +868,9 @@ export default function StakeholderTable({
                 />
               </td>
               <td>
-                <input
-                  className="inline-input"
+                <GrowArea
                   value={s.nextAction}
-                  placeholder="次回アクションを入力"
+                  placeholder="次回アクションを入力（改行で複数記載OK）"
                   onChange={(e) => patch(s.id, { nextAction: e.target.value })}
                   onBlur={(e) => onNext(s, e.target.value)}
                 />
@@ -804,6 +879,23 @@ export default function StakeholderTable({
                     ⚠ {!s.nextAction ? "次回アクション未設定" : "14日以上停滞"}
                   </div>
                 )}
+              </td>
+              <td>
+                <GrowArea
+                  value={s.actionLog}
+                  placeholder="実施したことを記録（改行で追記）"
+                  onChange={(e) => patch(s.id, { actionLog: e.target.value })}
+                  onBlur={(e) => onActionLog(s, e.target.value)}
+                />
+              </td>
+              <td>
+                <GrowArea
+                  value={s.minutes}
+                  placeholder="議事録URLを貼る（1行に1URL・MTGごとに追記）"
+                  onChange={(e) => patch(s.id, { minutes: e.target.value })}
+                  onBlur={(e) => onMinutes(s, e.target.value)}
+                />
+                <MinuteLinks text={s.minutes} />
               </td>
               <td>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -859,9 +951,10 @@ export default function StakeholderTable({
           ))}
         </tbody>
       </table>
+      </div>
       <div className="footnote">
         「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。
-        ステータス・金額・次回アクションはその場で編集できます。
+        次回アクション・アクションログは改行して複数記載できます。議事録はMTGのたびにURLを1行ずつ追記すると 📄1 📄2 … のリンクになります。
       </div>
 
       {showAdd && (

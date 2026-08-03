@@ -85,6 +85,8 @@ export interface RawStakeholder {
   next_action: string;
   next_action_due: string | null;
   link?: string | null; // 関連URL
+  minutes?: string | null; // 議事録URL（1行に1URL・MTGごとに追記）
+  action_log?: string | null; // アクションログ（実施済みの記録）
   is_sample: boolean;
 }
 export interface RawTriggerEvent {
@@ -227,6 +229,8 @@ export function buildDashboard(
       nextAction: s.next_action,
       nextActionDue: s.next_action_due,
       url: s.link ?? "",
+      minutes: s.minutes ?? "",
+      actionLog: s.action_log ?? "",
       isSample: s.is_sample,
       isStale: isStale(
         {
