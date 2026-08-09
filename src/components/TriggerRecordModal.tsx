@@ -155,6 +155,7 @@ export default function TriggerRecordModal({
                 base={base}
                 checked={checklistChecked(selected.code)}
                 onToggle={(i) => onChecklistToggle(selected.code, i)}
+                actorName={recordedBy}
               />
               <p style={{ fontSize: 10, color: "var(--gray)", marginTop: 4 }}>
                 チェックは保存され、全員に共有されます（段階的に埋めていけます）

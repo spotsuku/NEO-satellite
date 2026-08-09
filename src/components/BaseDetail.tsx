@@ -284,6 +284,7 @@ export default function BaseDetail({
                   dark
                   checked={checklistChecked(nextT.code)}
                   onToggle={(i) => onChecklistToggle(nextT.code, i)}
+                  actorName={recorderName}
                 />
               </div>
             )}
