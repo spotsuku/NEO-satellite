@@ -90,6 +90,7 @@ export interface Stakeholder {
   url: string; // 関連URL（会社サイト・資料等）
   minutes: string; // 議事録URL（1行に1URL・MTGごとに追記）
   actionLog: string; // アクションログ（実施済みの記録・複数行）
+  memo: string; // 備考メモ（自由記述・複数行）
   isSample: boolean;
   isStale: boolean;
 }

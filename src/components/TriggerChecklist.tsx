@@ -3,19 +3,16 @@
 // 成立条件チェックリスト。「何をクリアすればいいか」を短い項目で示す。
 // base を渡すと準備室5ロール・加盟金のトリガー（auto_rule で判定）は実データから自動でチェック状態を計算する。
 
-import type { Trigger, BaseView, Stakeholder } from "@/lib/types";
+import type { Trigger, BaseView } from "@/lib/types";
 import { YEN } from "@/lib/domain";
 
 export interface CheckItem {
   label: string;
   done: boolean | null; // null = 手動確認項目（自動判定なし）
+  meta?: boolean; // 期限など「作業の前進」を意味しない付帯項目（進行中判定から除外）
 }
 
-export function buildChecklist(
-  trigger: Trigger,
-  base?: BaseView | null,
-  stakeholders?: Stakeholder[],
-): CheckItem[] {
+export function buildChecklist(trigger: Trigger, base?: BaseView | null): CheckItem[] {
   if (base && trigger.autoRule === "prep_complete" && base.prep.length > 0) {
     return base.prep.map((p) => ({
       label: `${p.roleName}を確保${p.stakeholderName && p.stakeholderName !== "—" ? `（${p.stakeholderName}）` : ""}`,
@@ -23,18 +20,9 @@ export function buildChecklist(
     }));
   }
   if (base && trigger.autoRule === "goal_reached") {
-    const items: CheckItem[] = [];
-    // 1社ずつのチェック: 金額を持つステークホルダー（オーナー候補等）ごとに1行。
-    // 企業リストでその社のステータスを「確定」にすると自動でチェックが付く。
-    const owners = (stakeholders ?? []).filter(
-      (s) => s.baseCode === base.code && s.usesAmount && (s.commitAmount ?? 0) > 0,
-    );
-    for (const o of owners) {
-      items.push({
-        label: `${o.name} ${YEN(o.commitAmount!)}万 — ${o.status === "確定" ? "加盟確定 🎉" : o.status}`,
-        done: o.status === "確定",
-      });
-    }
+    // T6と同じ「1社目/2社目/3社目」の手動チェック（保存・全員共有）を先頭に、
+    // 自動判定（確定合計・期限）をその下に表示する。
+    const items: CheckItem[] = trigger.checklist.map((label) => ({ label, done: null }));
     items.push({
       label: `確定合計 ${YEN(base.money.fixed)} / ${YEN(base.goalAmount)}万円`,
       done: base.money.fixed >= base.goalAmount,
@@ -46,9 +34,10 @@ export function buildChecklist(
             ? `期限内（${base.deadlineLabel} まで・残り${base.daysLeft}日）`
             : `期限超過 ${-base.daysLeft}日（${base.deadlineLabel} まで）`,
         done: base.daysLeft >= 0,
+        meta: true,
       });
     } else {
-      items.push({ label: "T1成立から90日以内にクリアする（T1未成立・時計未始動）", done: null });
+      items.push({ label: "T1成立から90日以内にクリアする（T1未成立・時計未始動）", done: null, meta: true });
     }
     return items;
   }
@@ -58,19 +47,17 @@ export function buildChecklist(
 export default function TriggerChecklist({
   trigger,
   base,
-  stakeholders,
   dark,
   checked,
   onToggle,
 }: {
   trigger: Trigger;
   base?: BaseView | null;
-  stakeholders?: Stakeholder[]; // 加盟金トリガーの「1社ずつ」自動チェック用
   dark?: boolean; // 黒地（NEXT TRIGGER カード内）用の配色
   checked?: boolean[]; // 手動チェック（記録モーダル用・保存はしない）
   onToggle?: (i: number) => void;
 }) {
-  const items = buildChecklist(trigger, base, stakeholders);
+  const items = buildChecklist(trigger, base);
   const doneCount = items.filter((x, i) => (x.done === null ? checked?.[i] : x.done)).length;
   const sub = dark ? "var(--lgray)" : "var(--gray)";
   const ink = dark ? "#fff" : "var(--ink)";

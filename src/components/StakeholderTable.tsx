@@ -139,6 +139,7 @@ function AddModal({
       url,
       minutes: "",
       actionLog: "",
+      memo: "",
       isSample: false,
       isStale: false,
     });
@@ -341,6 +342,11 @@ export default function StakeholderTable({
     patch(s.id, { minutes });
     await updateStakeholder({ id: s.id, minutes, actorName: recorderName });
   }
+  async function onMemo(s: Stakeholder, memo: string) {
+    if (memo === s.memo) return;
+    patch(s.id, { memo });
+    await updateStakeholder({ id: s.id, memo, actorName: recorderName });
+  }
   async function onAmount(s: Stakeholder, raw: string) {
     const commitAmount = raw === "" ? null : Number(raw);
     patch(s.id, { commitAmount });
@@ -417,6 +423,7 @@ export default function StakeholderTable({
       url: r.url ?? "",
       minutes: "",
       actionLog: "",
+      memo: "",
       isSample: false,
       isStale: false,
     };
@@ -521,7 +528,7 @@ export default function StakeholderTable({
   // 表示中の行をスプレッドシート形式（TSV）でコピー（複数行セルは「 / 」に畳む）
   async function copyTsv() {
     const flat = (v: string) => v.replace(/\r?\n/g, " / ");
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
     const lines = rows.map((s) =>
       [
         s.baseName,
@@ -535,6 +542,7 @@ export default function StakeholderTable({
         flat(s.nextAction),
         flat(s.actionLog),
         flat(s.minutes),
+        flat(s.memo),
         s.url,
       ].join("\t"),
     );
@@ -544,7 +552,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -559,6 +567,7 @@ export default function StakeholderTable({
         s.nextAction,
         s.actionLog,
         s.minutes,
+        s.memo,
         s.url,
       ]
         .map((v) => esc(String(v)))
@@ -606,7 +615,7 @@ export default function StakeholderTable({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-      <table style={{ minWidth: 1560 }}>
+      <table style={{ minWidth: 1720 }}>
         <thead>
           <tr>
             <th style={{ minWidth: 64 }}>拠点</th>
@@ -620,6 +629,7 @@ export default function StakeholderTable({
             <th style={{ minWidth: 170 }}>次回アクション</th>
             <th style={{ minWidth: 170 }}>アクションログ</th>
             <th style={{ minWidth: 160 }}>議事録</th>
+            <th style={{ minWidth: 160 }}>備考メモ</th>
             <th style={{ width: 130 }}>URL</th>
             <th style={{ width: 40 }} />
           </tr>
@@ -723,6 +733,7 @@ export default function StakeholderTable({
                 onKeyDown={onDraftEnter}
               />
             </td>
+            <td className="dim">—</td>
             <td className="dim">—</td>
             <td className="dim">—</td>
             <td>
@@ -896,6 +907,14 @@ export default function StakeholderTable({
                   onBlur={(e) => onMinutes(s, e.target.value)}
                 />
                 <MinuteLinks text={s.minutes} />
+              </td>
+              <td>
+                <GrowArea
+                  value={s.memo}
+                  placeholder="備考メモ（自由記述）"
+                  onChange={(e) => patch(s.id, { memo: e.target.value })}
+                  onBlur={(e) => onMemo(s, e.target.value)}
+                />
               </td>
               <td>
                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

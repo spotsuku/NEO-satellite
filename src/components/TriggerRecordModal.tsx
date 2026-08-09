@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { recordTriggerEvent } from "@/app/actions";
-import type { Trigger, BaseView, Stakeholder, TriggerNote } from "@/lib/types";
+import type { Trigger, BaseView, TriggerNote } from "@/lib/types";
 import TriggerChecklist from "./TriggerChecklist";
 
 export interface RecordPayload {
@@ -18,7 +18,6 @@ export default function TriggerRecordModal({
   baseCode,
   baseName,
   base,
-  stakeholders,
   triggers,
   achievedCodes,
   initialCode,
@@ -36,7 +35,6 @@ export default function TriggerRecordModal({
   baseCode: string;
   baseName: string;
   base?: BaseView | null;
-  stakeholders?: Stakeholder[];
   triggers: Trigger[];
   achievedCodes: string[];
   initialCode: string;
@@ -155,7 +153,6 @@ export default function TriggerRecordModal({
               <TriggerChecklist
                 trigger={selected}
                 base={base}
-                stakeholders={stakeholders}
                 checked={checklistChecked(selected.code)}
                 onToggle={(i) => onChecklistToggle(selected.code, i)}
               />

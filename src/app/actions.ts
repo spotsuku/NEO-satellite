@@ -108,6 +108,7 @@ export interface UpdateStakeholderInput {
   url?: string; // 関連URL
   minutes?: string; // 議事録URL（1行に1URL）
   actionLog?: string; // アクションログ
+  memo?: string; // 備考メモ
   actorName: string;
 }
 
@@ -136,6 +137,7 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   if (input.url !== undefined) patch.link = input.url || null;
   if (input.minutes !== undefined) patch.minutes = input.minutes || null;
   if (input.actionLog !== undefined) patch.action_log = input.actionLog || null;
+  if (input.memo !== undefined) patch.memo = input.memo || null;
   if (input.category !== undefined) {
     const { data: cat } = await db.from("categories").select("id").eq("name", input.category).single();
     if (!cat) return { ok: false, error: "カテゴリが見つかりません" };

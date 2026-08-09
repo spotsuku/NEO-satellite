@@ -4,6 +4,17 @@ import type { BaseView, Trigger } from "@/lib/types";
 import { YEN, pct } from "@/lib/domain";
 import Silhouette from "./Silhouette";
 import MoneyBar from "./MoneyBar";
+import { buildChecklist } from "./TriggerChecklist";
+
+// 成立条件チェックの進捗（自動判定＋保存済み手動チェック。期限などの付帯項目は除外）
+function ckProgress(t: Trigger, base: BaseView, checked: boolean[]): { done: number; total: number } {
+  const items = buildChecklist(t, base);
+  const work = items
+    .map((it, i) => ({ it, i }))
+    .filter(({ it }) => !it.meta);
+  const done = work.filter(({ it, i }) => (it.done === null ? Boolean(checked?.[i]) : it.done)).length;
+  return { done, total: work.length };
+}
 
 function PrepDots({ base }: { base: BaseView }) {
   return (
@@ -24,10 +35,12 @@ function PrepDots({ base }: { base: BaseView }) {
 function Chain({
   base,
   triggers,
+  checkedFor,
   onDotClick,
 }: {
   base: BaseView;
   triggers: Trigger[];
+  checkedFor: (baseCode: string, triggerCode: string) => boolean[];
   onDotClick: (baseCode: string, trigger: Trigger) => void;
 }) {
   const doneSet = new Set(base.achievedCodes);
@@ -37,13 +50,20 @@ function Chain({
         const done = doneSet.has(t.code);
         const now = t.code === base.next.code;
         const prevDone = i > 0 && doneSet.has(triggers[i - 1].code);
+        // 未成立でもチェックが埋まり始めたら黄色リングで「進行中」を示す
+        const p = done ? null : ckProgress(t, base, checkedFor(base.code, t.code));
+        const inProgress = p !== null && p.done > 0;
         return (
           <span key={t.code} style={{ display: "contents" }}>
             {i > 0 && <span className={`cl ${prevDone && done ? "done" : ""}`} />}
             <span
-              className={`cd ${done ? "done" : now ? "now" : ""}`}
+              className={`cd ${done ? "done" : now ? "now" : ""}${inProgress ? " prog" : ""}`}
               style={{ cursor: "pointer" }}
-              title={`${t.code} ${t.name}${done ? "（成立済み）" : `\n成立条件: ${t.criteria}\nクリックで成立を記録`}`}
+              title={`${t.code} ${t.name}${
+                done
+                  ? "（成立済み）"
+                  : `${inProgress ? `\n進行中: 成立条件 ${p!.done}/${p!.total} 完了` : ""}\n成立条件: ${t.criteria}\nクリックで成立を記録`
+              }`}
               onClick={(e) => {
                 e.stopPropagation();
                 onDotClick(base.code, t);
@@ -59,11 +79,13 @@ function Chain({
 export default function BoardCards({
   bases,
   triggers,
+  checkedFor,
   onSelectBase,
   onDotClick,
 }: {
   bases: BaseView[];
   triggers: Trigger[];
+  checkedFor: (baseCode: string, triggerCode: string) => boolean[];
   onSelectBase: (code: string) => void;
   onDotClick: (baseCode: string, trigger: Trigger) => void;
 }) {
@@ -87,7 +109,7 @@ export default function BoardCards({
             </div>
 
             <Silhouette id={b.code} path={b.silhouettePath} progress={prog} />
-            <Chain base={b} triggers={triggers} onDotClick={onDotClick} />
+            <Chain base={b} triggers={triggers} checkedFor={checkedFor} onDotClick={onDotClick} />
 
             <div className="mrow">
               <span>加盟金</span>
@@ -171,6 +193,16 @@ export default function BoardCards({
             >
               <b>NEXT</b>
               {b.next.code} {b.next.name}
+              {(() => {
+                const t = triggers.find((x) => x.code === b.next.code);
+                if (!t) return null;
+                const p = ckProgress(t, b, checkedFor(b.code, t.code));
+                return p.done > 0 ? (
+                  <span style={{ color: "var(--yellow)", fontWeight: 800, marginLeft: 6 }}>
+                    {p.done}/{p.total} 進行中
+                  </span>
+                ) : null;
+              })()}
               <span className="nxrec">✎ 記録</span>
             </span>
             <div className="cardacts">

@@ -50,6 +50,10 @@ export function Legend({ total }: { total?: number }) {
         次のトリガー（準備中）
       </span>
       <span>
+        <span className="dot" style={{ border: "2px solid var(--yellow)", boxShadow: "0 0 0 2px rgba(240,240,0,.35)" }} />
+        進行中（チェックが埋まり始め）
+      </span>
+      <span>
         <span className="dot fut" />
         未到達
       </span>

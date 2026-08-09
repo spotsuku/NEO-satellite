@@ -5,7 +5,7 @@ import type { BaseView, Trigger, Stakeholder, StatusDef, PrepState, TriggerNote 
 import { YEN, pct } from "@/lib/domain";
 import { updatePrepAssignment, recordFuelMetrics } from "@/app/actions";
 import MoneyBar from "./MoneyBar";
-import TriggerChecklist from "./TriggerChecklist";
+import TriggerChecklist, { buildChecklist } from "./TriggerChecklist";
 
 const PREP_CYCLE: Record<PrepState, PrepState> = { 未: "検討中", 検討中: "確保", 確保: "未" };
 
@@ -281,7 +281,6 @@ export default function BaseDetail({
                 <TriggerChecklist
                   trigger={nextT}
                   base={base}
-                  stakeholders={sh}
                   dark
                   checked={checklistChecked(nextT.code)}
                   onToggle={(i) => onChecklistToggle(nextT.code, i)}
@@ -305,6 +304,13 @@ export default function BaseDetail({
               {triggers.map((t) => {
                 const achieved = base.achievedCodes.includes(t.code);
                 const log = base.history.find((h) => h.title.startsWith(`${t.code} `));
+                // チェックが1つでも埋まったら「進行中」— 全部埋まる前から前進が見えるように
+                // （期限内などの付帯項目は「作業の前進」ではないため除外）
+                const allItems = buildChecklist(t, base);
+                const checked = checklistChecked(t.code);
+                const work = allItems.map((it, i) => ({ it, i })).filter(({ it }) => !it.meta);
+                const items = work.map(({ it }) => it);
+                const ckDone = work.filter(({ it, i }) => (it.done === null ? Boolean(checked?.[i]) : it.done)).length;
                 return (
                   <tr key={t.code}>
                     <td style={{ width: 42 }}>
@@ -315,6 +321,14 @@ export default function BaseDetail({
                       {achieved ? (
                         <span className="stat filled" style={{ ["--dc" as string]: "var(--green)" }}>
                           成立 {log ? log.date : ""}
+                        </span>
+                      ) : ckDone > 0 ? (
+                        <span
+                          className="stat filled"
+                          style={{ ["--dc" as string]: "var(--yellow)" }}
+                          title={`成立条件チェック ${ckDone}/${items.length} 完了`}
+                        >
+                          進行中 {ckDone}/{items.length}
                         </span>
                       ) : (
                         <span className="stat" style={{ ["--dc" as string]: "var(--lgray)", color: "var(--gray)" }}>

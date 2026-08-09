@@ -299,6 +299,8 @@ textarea.inline-input { resize: none; overflow: hidden; line-height: 1.6; min-he
 .card .chain .cd { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--lgray); background: var(--paper); flex: none; position: relative; z-index: 1; }
 .card .chain .cd.done { border-color: var(--green); background: var(--green); }
 .card .chain .cd.now { border: 3px solid var(--ink); animation: pulse 1.6s ease-in-out infinite; }
+/* 進行中（成立条件チェックが埋まり始めた未成立トリガー）: 黄色リング */
+.card .chain .cd.prog { border-color: var(--yellow); box-shadow: 0 0 0 2px rgba(240,240,0,.35); }
 .card .chain .cl { flex: 1; height: 2px; background: var(--line); }
 .card .chain .cl.done { background: var(--green); }
 .card .mrow { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--gray); }

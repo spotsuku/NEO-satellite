@@ -166,6 +166,7 @@ async function fetchSupabaseBundle(): Promise<RawBundle> {
       link: s.link,
       minutes: s.minutes ?? null,
       action_log: s.action_log ?? null,
+      memo: s.memo ?? null,
       is_sample: s.is_sample ?? false,
     })),
     triggerEvents: ((triggerEvents.data ?? []) as any[]).map((e) => ({
