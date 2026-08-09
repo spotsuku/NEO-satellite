@@ -24,7 +24,7 @@ const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 const KYUSHU_KEY = "neo_kyushu_open_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.10.0";
+export const APP_VERSION = "v0.11.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -436,6 +436,7 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
           baseCode={recordModal.baseCode}
           baseName={data.bases.find((b) => b.code === recordModal.baseCode)?.name ?? ""}
           base={data.bases.find((b) => b.code === recordModal.baseCode)}
+          stakeholders={data.stakeholders}
           triggers={data.triggers}
           achievedCodes={data.bases.find((b) => b.code === recordModal.baseCode)?.achievedCodes ?? []}
           initialCode={recordModal.initialCode}

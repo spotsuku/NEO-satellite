@@ -22,7 +22,7 @@ export default function Celebration({
       <div className="cbar b5" />
       <div className="cbar b6" />
       <div className="cmsg">
-        <div className="ck">TRIGGER {state?.code ?? ""}</div>
+        <div className="ck">{state?.code ? `TRIGGER ${state.code}` : "BIG NEWS"}</div>
         <div className="ct">{state?.title ?? ""}</div>
         <div className="cs">{state?.subtitle ?? ""}</div>
         <button className="cx" onClick={onClose}>

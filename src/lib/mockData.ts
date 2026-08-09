@@ -19,7 +19,7 @@ export const MOCK_BUNDLE: RawBundle = {
     { code: "T3", name: "事務局リーダー確定", description: "地域の旗を振る若手人材", is_clock_start: false, auto_rule: null, sort: 3 },
     { code: "T4", name: "準備室発足", description: "5ロール各1名以上で完成", is_clock_start: false, auto_rule: "prep_complete", sort: 4 },
     { code: "T5", name: "現地説明会", description: "地域に構想をお披露目", is_clock_start: false, auto_rule: null, sort: 5 },
-    { code: "T6", name: "オーナー候補トップ会談", description: "経営者が出資検討者になる", is_clock_start: false, auto_rule: null, sort: 6 },
+    { code: "T6", name: "オーナー候補トップ会談", description: "3社の経営者が出資検討者になる", is_clock_start: false, auto_rule: null, sort: 6 },
     { code: "T7", name: "1社目調印式", description: "構想が実在に変わる", is_clock_start: false, auto_rule: null, sort: 7 },
     { code: "T8", name: "加盟金3000万円達成", description: "立上げ条件クリア（T1から3ヶ月）", is_clock_start: false, auto_rule: "goal_reached", sort: 8 },
     { code: "T9", name: "キックオフ（開校）", description: "本番の舞台が始まる", is_clock_start: false, auto_rule: null, sort: 9 },

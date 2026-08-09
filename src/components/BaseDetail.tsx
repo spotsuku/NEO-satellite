@@ -281,6 +281,7 @@ export default function BaseDetail({
                 <TriggerChecklist
                   trigger={nextT}
                   base={base}
+                  stakeholders={sh}
                   dark
                   checked={checklistChecked(nextT.code)}
                   onToggle={(i) => onChecklistToggle(nextT.code, i)}

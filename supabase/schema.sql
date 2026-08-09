@@ -337,10 +337,21 @@ begin
   end if;
   select name into old_st from statuses where id = old.status_id;
   if new.status_id is distinct from old.status_id then
-    is_advance := new_st in ('内諾','確定');
-    insert into activities(base_id, kind, title, body, is_big, actor_name)
-    values (new.base_id, 'status',
-            format('%s：%s → %s', new.name, old_st, new_st), null, is_advance, new.updated_by);
+    if new_st = '確定' then
+      -- 1社ずつのお祝い: 加盟確定は社名＋金額入りの祝いメッセージで全員に演出
+      insert into activities(base_id, kind, title, body, is_big, actor_name)
+      values (new.base_id, 'status',
+              format('🎉 %s 加盟確定！', new.name),
+              case when new.commit_amount is not null and new.commit_amount > 0
+                   then format('加盟金 %s万円が確定（%s → %s）', new.commit_amount, old_st, new_st)
+                   else format('%s → %s', old_st, new_st) end,
+              true, new.updated_by);
+    else
+      is_advance := new_st = '内諾';
+      insert into activities(base_id, kind, title, body, is_big, actor_name)
+      values (new.base_id, 'status',
+              format('%s：%s → %s', new.name, old_st, new_st), null, is_advance, new.updated_by);
+    end if;
   end if;
   if new.commit_amount is distinct from old.commit_amount then
     insert into activities(base_id, kind, title, body, is_big, actor_name)
