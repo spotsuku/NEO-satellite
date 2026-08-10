@@ -21,7 +21,7 @@ function PrepDots({ base }: { base: BaseView }) {
     <span className="pdots">
       {base.prep.map((p, i) => {
         const style =
-          p.state === "確保"
+          p.state === "合意"
             ? { background: "var(--green)", borderColor: "var(--green)" }
             : p.state === "検討中"
               ? { background: "var(--yellow)", borderColor: "var(--yellow)" }

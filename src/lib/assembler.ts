@@ -291,7 +291,7 @@ export function buildDashboard(
         stakeholderName: p.stakeholder_name,
       }));
       const prepTotal = prepRows.length || 5;
-      const prepSecured = prep.filter((p) => p.state === "確保").length;
+      const prepSecured = prep.filter((p) => p.state === "合意").length;
 
       // NEXT = 最初の未成立トリガー（飛び石で成立した場合も正しく指す）
       const nextT =

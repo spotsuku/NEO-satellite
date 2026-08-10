@@ -575,7 +575,7 @@ export async function setChecklistItem(input: {
 export async function updatePrepAssignment(input: {
   baseCode: string;
   roleName: string;
-  state: "未" | "検討中" | "確保";
+  state: "未" | "検討中" | "合意";
   actorName: string;
 }): Promise<ActionResult> {
   const db = getServiceClient();

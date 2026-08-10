@@ -7,7 +7,7 @@ import { updatePrepAssignment, recordFuelMetrics } from "@/app/actions";
 import MoneyBar from "./MoneyBar";
 import TriggerChecklist, { buildChecklist } from "./TriggerChecklist";
 
-const PREP_CYCLE: Record<PrepState, PrepState> = { 未: "検討中", 検討中: "確保", 確保: "未" };
+const PREP_CYCLE: Record<PrepState, PrepState> = { 未: "検討中", 検討中: "合意", 合意: "未" };
 
 function FuelModal({
   base,
@@ -142,7 +142,7 @@ export default function BaseDetail({
           <span className="pk">PROPOSAL</span>
           <div>
             <div className="pt">{prepCode} 準備室発足の条件を満たしました</div>
-            <div className="ps">5ロールすべて「確保」。成立にしますか？（成立日・証拠の入力が必要です）</div>
+            <div className="ps">5ロールすべて「合意」。成立にしますか？（成立日・証拠の入力が必要です）</div>
           </div>
           <button className="rec-btn solid" onClick={() => onRecord(prepCode)}>
             {prepCode}成立を記録
@@ -231,7 +231,7 @@ export default function BaseDetail({
               {base.prep.map((p) => {
                 const state = prepOverride[p.roleName] ?? p.state;
                 const col =
-                  state === "確保" ? "var(--green)" : state === "検討中" ? "var(--yellow)" : "var(--lgray)";
+                  state === "合意" ? "var(--green)" : state === "検討中" ? "var(--yellow)" : "var(--lgray)";
                 return (
                   <tr key={p.roleName}>
                     <td style={{ width: "38%" }}>
@@ -242,7 +242,7 @@ export default function BaseDetail({
                       <span
                         className={`stat ${state !== "未" ? "filled" : ""}`}
                         style={{ ["--dc" as string]: col, cursor: "pointer" }}
-                        title="クリックで 未 → 検討中 → 確保 を切替"
+                        title="クリックで 未 → 検討中 → 合意 を切替"
                         onClick={() => cyclePrep(p.roleName, state)}
                       >
                         {state}

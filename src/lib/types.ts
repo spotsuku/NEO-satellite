@@ -49,7 +49,7 @@ export interface MoneyPipeline {
   weighted: number; // 確定 + Σ(進行中 × 確度)
 }
 
-export type PrepState = "未" | "検討中" | "確保";
+export type PrepState = "未" | "検討中" | "合意";
 
 export interface PrepRole {
   roleName: string;
@@ -120,7 +120,7 @@ export interface BaseView {
   next: NextTrigger;
   history: TriggerLogEntry[];
   staleCount: number;
-  proposePrep: boolean; // 準備室5ロール確保 → 準備室トリガー成立提案
+  proposePrep: boolean; // 準備室5ロール合意 → 準備室トリガー成立提案
   proposeGoal: boolean; // 確定 >= 目標 → 加盟金トリガー成立提案
 }
 

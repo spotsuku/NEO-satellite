@@ -139,7 +139,7 @@ create table if not exists prep_assignments (
   base_id uuid not null references bases(id),
   role_id uuid not null references prep_role_defs(id),
   stakeholder_id uuid references stakeholders(id),
-  state text not null default '未' check (state in ('未','検討中','確保')),
+  state text not null default '未' check (state in ('未','検討中','合意')),
   updated_at timestamptz default now(),
   updated_by text,
   unique (base_id, role_id)
@@ -281,7 +281,7 @@ create or replace view v_base_progress as
 select b.id as base_id, b.code, b.name, b.goal_amount,
   (select count(*) from trigger_events te where te.base_id = b.id)                       as triggers_done,
   (select count(*) from triggers)                                                        as triggers_total,
-  (select count(*) from prep_assignments pa where pa.base_id = b.id and pa.state = '確保') as prep_secured,
+  (select count(*) from prep_assignments pa where pa.base_id = b.id and pa.state = '合意') as prep_secured,
   (select count(*) from prep_role_defs)                                                  as prep_total
 from bases b where b.is_active;
 

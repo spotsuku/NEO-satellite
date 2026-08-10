@@ -2,7 +2,7 @@
 
 // 成立条件チェックリスト。「何をクリアすればいいか」を短い項目で示す。
 // base を渡すと準備室5ロール・加盟金のトリガー（auto_rule で判定）は実データから自動でチェック状態を計算する。
-// 準備室ロールの項目は actorName 付きで描画するとクリックで「確保⇄未」を直接切り替えられる。
+// 準備室ロールの項目は actorName 付きで描画するとクリックで「合意⇄未」を直接切り替えられる。
 
 import { useState } from "react";
 import type { Trigger, BaseView, PrepState } from "@/lib/types";
@@ -19,8 +19,8 @@ export interface CheckItem {
 export function buildChecklist(trigger: Trigger, base?: BaseView | null): CheckItem[] {
   if (base && trigger.autoRule === "prep_complete" && base.prep.length > 0) {
     return base.prep.map((p) => ({
-      label: `${p.roleName}を確保${p.stakeholderName && p.stakeholderName !== "—" ? `（${p.stakeholderName}）` : ""}`,
-      done: p.state === "確保",
+      label: `${p.roleName}と合意${p.stakeholderName && p.stakeholderName !== "—" ? `（${p.stakeholderName}）` : ""}`,
+      done: p.state === "合意",
       prepRole: p.roleName,
     }));
   }
@@ -62,7 +62,7 @@ export default function TriggerChecklist({
   dark?: boolean; // 黒地（NEXT TRIGGER カード内）用の配色
   checked?: boolean[]; // 手動チェック（記録モーダル用・保存はしない）
   onToggle?: (i: number) => void;
-  actorName?: string; // 指定すると準備室ロール項目をクリックで確保⇄未に切り替えられる
+  actorName?: string; // 指定すると準備室ロール項目をクリックで合意⇄未に切り替えられる
 }) {
   // 準備室ロールの楽観的上書き（クリック直後に反映。サーバー反映後は本データが揃う）
   const [prepOv, setPrepOv] = useState<Record<string, PrepState>>({});
@@ -77,7 +77,7 @@ export default function TriggerChecklist({
 
   function togglePrep(roleName: string, isDone: boolean) {
     if (!base || !actorName) return;
-    const next: PrepState = isDone ? "未" : "確保";
+    const next: PrepState = isDone ? "未" : "合意";
     setPrepOv((o) => ({ ...o, [roleName]: next }));
     void updatePrepAssignment({ baseCode: base.code, roleName, state: next, actorName });
   }
@@ -112,7 +112,7 @@ export default function TriggerChecklist({
               }}
               title={
                 prepClickable
-                  ? "クリックで準備室ロールを確保⇄未に切り替え（保存され全員に共有）"
+                  ? "クリックで準備室ロールと合意⇄未に切り替え（保存され全員に共有）"
                   : clickable
                     ? "クリックでチェック（保存され全員に共有）"
                     : undefined

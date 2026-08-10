@@ -68,14 +68,14 @@ export const MOCK_BUNDLE: RawBundle = {
     { base_code: "kumamoto", trigger_code: "T1", achieved_on: "2026-06-25", participants: "地元企業キーマン", evidence: "半導体関連の進出で地元企業の人材危機感が強い。紹介協力の合意取得。⏱ 3ヶ月時計スタート。", recorded_by: "システム（サンプル）" },
   ],
   prep: [
-    // 大分: 3/5 確保・1検討中
-    { base_code: "oita", role_name: "現地紹介者", sort: 1, state: "確保", stakeholder_name: "◯◯氏（地場金融OB）" },
-    { base_code: "oita", role_name: "オーナー企業候補", sort: 2, state: "確保", stakeholder_name: "ジェイリース" },
+    // 大分: 3/5 合意・1検討中
+    { base_code: "oita", role_name: "現地紹介者", sort: 1, state: "合意", stakeholder_name: "◯◯氏（地場金融OB）" },
+    { base_code: "oita", role_name: "オーナー企業候補", sort: 2, state: "合意", stakeholder_name: "ジェイリース" },
     { base_code: "oita", role_name: "学生リーダー候補", sort: 3, state: "検討中", stakeholder_name: "K氏（APU3年・検討中）" },
-    { base_code: "oita", role_name: "大学・高校関係者", sort: 4, state: "確保", stakeholder_name: "APU 地域連携室" },
+    { base_code: "oita", role_name: "大学・高校関係者", sort: 4, state: "合意", stakeholder_name: "APU 地域連携室" },
     { base_code: "oita", role_name: "自治体関係者", sort: 5, state: "未", stakeholder_name: "未接触" },
     // 熊本: 1/5
-    { base_code: "kumamoto", role_name: "現地紹介者", sort: 1, state: "確保", stakeholder_name: "キーマン◯◯氏" },
+    { base_code: "kumamoto", role_name: "現地紹介者", sort: 1, state: "合意", stakeholder_name: "キーマン◯◯氏" },
     { base_code: "kumamoto", role_name: "オーナー企業候補", sort: 2, state: "検討中", stakeholder_name: "地場IT B社（アポ調整中）" },
     { base_code: "kumamoto", role_name: "学生リーダー候補", sort: 3, state: "未", stakeholder_name: "未接触" },
     { base_code: "kumamoto", role_name: "大学・高校関係者", sort: 4, state: "未", stakeholder_name: "未接触" },
@@ -121,7 +121,7 @@ export const MOCK_BUNDLE: RawBundle = {
     { id: "a7", base_name: "大分", kind: "trigger", title: "T1 地域の紹介役合意 成立", body: "地場金融OB ◯◯氏が紹介役に合意。⏱ 3ヶ月時計スタート。", is_big: true, actor_name: "事務局", created_at: "2026-06-02" },
   ],
   editorial: [
-    { base_code: "oita", note: "自治体関係者の確保が最後のピース。市 商工労政課へ紹介ルートでアプローチ", ready: "準備室ロール 3/5 確保・1名検討中" },
+    { base_code: "oita", note: "自治体関係者の合意が最後のピース。市 商工労政課へ紹介ルートでアプローチ", ready: "準備室ロール 3/5 合意・1名検討中" },
     { base_code: "kumamoto", note: "興味人材あと2名で開催ライン。◯◯氏の紹介2件を今週アポ", ready: "燃料：興味人材 4/6名" },
     { base_code: "nagasaki", note: "商工会議所ルートと大学ルートの2本で紹介役候補を探索中", ready: "候補2名と接触済み・合意未取得" },
     { base_code: "saga", note: "リスト作成中。紹介起点の候補洗い出しから", ready: "デスクリサーチ進行中" },
