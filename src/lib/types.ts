@@ -91,6 +91,7 @@ export interface Stakeholder {
   minutes: string; // 議事録URL（1行に1URL・MTGごとに追記）
   actionLog: string; // アクションログ（実施済みの記録・複数行）
   memo: string; // 備考メモ（自由記述・複数行）
+  reviewChecks: string[]; // 検討状況チェック（REVIEW_ITEMS のうちクリアした項目名）
   isSample: boolean;
   isStale: boolean;
 }

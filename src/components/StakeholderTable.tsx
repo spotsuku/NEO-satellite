@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Stakeholder, StatusDef, BaseView } from "@/lib/types";
-import { isStale } from "@/lib/domain";
+import { isStale, REVIEW_ITEMS } from "@/lib/domain";
 import {
   createStakeholder,
   createStakeholdersBulk,
@@ -140,6 +140,7 @@ function AddModal({
       minutes: "",
       actionLog: "",
       memo: "",
+      reviewChecks: [],
       isSample: false,
       isStale: false,
     });
@@ -347,6 +348,12 @@ export default function StakeholderTable({
     patch(s.id, { memo });
     await updateStakeholder({ id: s.id, memo, actorName: recorderName });
   }
+  async function onReviewToggle(s: Stakeholder, item: string) {
+    const cur = s.reviewChecks ?? [];
+    const reviewChecks = cur.includes(item) ? cur.filter((x) => x !== item) : [...cur, item];
+    patch(s.id, { reviewChecks });
+    await updateStakeholder({ id: s.id, reviewChecks, actorName: recorderName });
+  }
   async function onAmount(s: Stakeholder, raw: string) {
     const commitAmount = raw === "" ? null : Number(raw);
     patch(s.id, { commitAmount });
@@ -424,6 +431,7 @@ export default function StakeholderTable({
       minutes: "",
       actionLog: "",
       memo: "",
+      reviewChecks: [],
       isSample: false,
       isStale: false,
     };
@@ -528,7 +536,7 @@ export default function StakeholderTable({
   // 表示中の行をスプレッドシート形式（TSV）でコピー（複数行セルは「 / 」に畳む）
   async function copyTsv() {
     const flat = (v: string) => v.replace(/\r?\n/g, " / ");
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
     const lines = rows.map((s) =>
       [
         s.baseName,
@@ -537,6 +545,7 @@ export default function StakeholderTable({
         s.contactName,
         s.title,
         s.status,
+        (s.reviewChecks ?? []).join("・"),
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
         flat(s.nextAction),
@@ -552,7 +561,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -562,6 +571,7 @@ export default function StakeholderTable({
         s.contactName,
         s.title,
         s.status,
+        (s.reviewChecks ?? []).join("・"),
         s.commitAmount != null ? String(s.commitAmount) : "",
         s.approachedOn ?? "",
         s.nextAction,
@@ -615,7 +625,7 @@ export default function StakeholderTable({
       </div>
 
       <div style={{ overflowX: "auto" }}>
-      <table style={{ minWidth: 1720 }}>
+      <table style={{ minWidth: 1900 }}>
         <thead>
           <tr>
             <th style={{ minWidth: 64 }}>拠点</th>
@@ -624,6 +634,7 @@ export default function StakeholderTable({
             <th style={{ minWidth: 84 }}>氏名</th>
             <th style={{ minWidth: 76 }}>役職</th>
             <th style={{ minWidth: 100 }}>ステータス</th>
+            <th style={{ minWidth: 190 }}>検討状況</th>
             <th style={{ textAlign: "right", minWidth: 70 }}>金額(万)</th>
             <th style={{ minWidth: 106 }}>アプローチ日</th>
             <th style={{ minWidth: 170 }}>次回アクション</th>
@@ -708,6 +719,7 @@ export default function StakeholderTable({
                 ))}
               </select>
             </td>
+            <td className="dim">—</td>
             <td className="amtcell">
               {(categories.find((c) => c.name === draft.category)?.usesAmount ?? false) ? (
                 <input
@@ -855,6 +867,25 @@ export default function StakeholderTable({
                     ))}
                   </select>
                 </span>
+              </td>
+              <td>
+                <div className="rvchips" title="クリックで検討状況をチェック（保存され全員に共有）">
+                  {REVIEW_ITEMS.map((item) => {
+                    const on = (s.reviewChecks ?? []).includes(item);
+                    return (
+                      <button
+                        key={item}
+                        className={on ? "on" : ""}
+                        onClick={() => onReviewToggle(s, item)}
+                      >
+                        {on ? "✓ " : ""}{item}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--gray)", marginTop: 3 }}>
+                  {(s.reviewChecks ?? []).length}/{REVIEW_ITEMS.length}
+                </div>
               </td>
               <td className="amtcell" style={{ color: s.commitAmount ? "var(--ink)" : "var(--gray)" }}>
                 {s.usesAmount ? (

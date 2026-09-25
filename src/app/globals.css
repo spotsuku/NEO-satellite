@@ -170,6 +170,11 @@ textarea.inline-input { resize: none; overflow: hidden; line-height: 1.6; min-he
 .mlinks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .mlinks a { color: var(--cyan); font-weight: 700; text-decoration: none; font-size: 11px; border: 1px solid var(--line); padding: 1px 6px; }
 .mlinks a:hover { border-color: var(--cyan); }
+/* 検討状況チェック（顧客リスト）: クリックで✓が付くチップ */
+.rvchips { display: flex; flex-wrap: wrap; gap: 3px; }
+.rvchips button { font-family: 'Noto Sans JP', sans-serif; font-size: 10px; padding: 2px 7px; border: 1px solid var(--line); background: var(--paper); color: var(--gray); cursor: pointer; line-height: 1.5; }
+.rvchips button:hover { border-color: var(--ink); color: var(--ink); }
+.rvchips button.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 700; }
 
 /* ===== whiteboard map ===== */
 .maptools { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }

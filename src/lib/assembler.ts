@@ -88,6 +88,7 @@ export interface RawStakeholder {
   minutes?: string | null; // 議事録URL（1行に1URL・MTGごとに追記）
   action_log?: string | null; // アクションログ（実施済みの記録）
   memo?: string | null; // 備考メモ
+  review_checks?: string[] | null; // 検討状況チェック（項目名の配列）
   is_sample: boolean;
 }
 export interface RawTriggerEvent {
@@ -233,6 +234,7 @@ export function buildDashboard(
       minutes: s.minutes ?? "",
       actionLog: s.action_log ?? "",
       memo: s.memo ?? "",
+      reviewChecks: Array.isArray(s.review_checks) ? s.review_checks : [],
       isSample: s.is_sample,
       isStale: isStale(
         {

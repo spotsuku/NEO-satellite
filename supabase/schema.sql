@@ -121,6 +121,7 @@ create index if not exists idx_stakeholders_base on stakeholders(base_id);
 create index if not exists idx_stakeholders_status on stakeholders(status_id);
 alter table stakeholders add column if not exists minutes text;    -- 議事録URL（1行に1URL・MTGごとに追記）
 alter table stakeholders add column if not exists action_log text; -- アクションログ（実施済みの記録・複数行）
+alter table stakeholders add column if not exists review_checks jsonb; -- 検討状況チェック（クリアした項目名の配列）
 
 create table if not exists trigger_events (
   id uuid primary key default gen_random_uuid(),

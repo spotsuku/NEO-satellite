@@ -6,6 +6,19 @@ import type { StatusDef, MoneyPipeline, Fuels } from "./types";
 
 export const YEN = (n: number) => n.toLocaleString("ja-JP");
 
+// 検討状況のチェック項目（商談で確認・整理できた観点。顧客リストでチェック管理）
+export const REVIEW_ITEMS = [
+  "共感度",
+  "ニーズ",
+  "金額",
+  "規模",
+  "工数",
+  "効果",
+  "決済ルート",
+  "サービス理解",
+  "クロージング戦略",
+] as const;
+
 export const DEFAULT_FUEL_TARGETS: Fuels = {
   interest: 10,
   loi: 20,
