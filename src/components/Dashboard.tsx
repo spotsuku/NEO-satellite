@@ -12,6 +12,7 @@ import Kpis from "./Kpis";
 import BoardCards from "./BoardCards";
 import BaseDetail from "./BaseDetail";
 import StakeholderTable from "./StakeholderTable";
+import SalesView from "./SalesView";
 import ActivityFeed from "./ActivityFeed";
 import MapView from "./MapView";
 import Celebration, { type CelebrationState } from "./Celebration";
@@ -19,12 +20,12 @@ import TriggerRecordModal, { type RecordPayload } from "./TriggerRecordModal";
 import NameModal from "./NameModal";
 import KyushuMap from "./KyushuMap";
 
-type Tab = "board" | "stake" | "map" | "feed";
+type Tab = "board" | "stake" | "sales" | "map" | "feed";
 const NAME_KEY = "neo_actor_name";
 const HINT_KEY = "neo_hint_dismissed_v1";
 const KYUSHU_KEY = "neo_kyushu_open_v1";
 // どのビルドを見ているかの判別用（デプロイ確認）。リリース時に更新。
-export const APP_VERSION = "v0.14.0";
+export const APP_VERSION = "v0.15.0";
 
 export default function Dashboard({ data: initial }: { data: DashboardData }) {
   const router = useRouter();
@@ -334,6 +335,9 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
         <button className={tab === "stake" ? "on" : ""} onClick={() => setTab("stake")}>
           ステークホルダー
         </button>
+        <button className={tab === "sales" ? "on" : ""} onClick={() => setTab("sales")}>
+          営業進捗
+        </button>
         <button className={tab === "map" ? "on" : ""} onClick={() => setTab("map")}>
           関係図マップ
         </button>
@@ -413,6 +417,10 @@ export default function Dashboard({ data: initial }: { data: DashboardData }) {
             today={data.today}
             recorderName={name || "匿名"}
           />
+        </section>
+
+        <section className={`view ${tab === "sales" ? "on" : ""}`}>
+          {tab === "sales" && <SalesView data={data} />}
         </section>
 
         <section className={`view ${tab === "map" ? "on" : ""}`}>

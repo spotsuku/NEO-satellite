@@ -403,6 +403,49 @@ export default function StakeholderTable({
     }
   }
 
+
+  // スプレッドシートと同じキー操作: Enterで下のセルへ（textareaはShift/Alt+Enterで改行）、
+  // ↑↓で行移動（textareaは文頭/文末にいる時のみ）。Tabは標準どおり右のセルへ。
+  function onSheetKeyDown(e: React.KeyboardEvent) {
+    const el = e.target as HTMLElement;
+    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+    const td = el.closest("td") as HTMLTableCellElement | null;
+    const tr = el.closest("tr");
+    if (!td || !tr || tr.hasAttribute("data-draft")) return; // 追加行は Enter=行追加 のまま
+    const isTextarea = el.tagName === "TEXTAREA";
+    const box = el as HTMLTextAreaElement;
+    const inputType = el.tagName === "INPUT" ? (el as HTMLInputElement).type : "";
+
+    const move = (dir: 1 | -1) => {
+      const rowsEl = Array.from(tr.closest("table")!.querySelectorAll("tr.row"));
+      const i = rowsEl.indexOf(tr as HTMLTableRowElement);
+      const next = rowsEl[i + dir] as HTMLTableRowElement | undefined;
+      const cell = next?.cells[td.cellIndex];
+      const target = cell?.querySelector<HTMLElement>("input, select, textarea");
+      if (!target) return;
+      e.preventDefault();
+      (el as HTMLInputElement).blur?.(); // onBlur 保存を発火してから移動
+      target.focus();
+      if (target instanceof HTMLInputElement && target.type === "text") target.select();
+    };
+
+    if (e.key === "Enter") {
+      if (e.nativeEvent.isComposing || (e.nativeEvent as KeyboardEvent).keyCode === 229) return; // IME確定
+      if (el.tagName === "SELECT") return;
+      if (isTextarea && (e.altKey || e.shiftKey)) return; // 改行はShift/Alt+Enter
+      move(1);
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (el.tagName === "SELECT" || inputType === "date" || inputType === "number") return; // 標準動作を優先
+      if (isTextarea) {
+        const atEnd = box.selectionStart === (box.value ?? "").length;
+        const atStart = (box.selectionStart ?? 0) === 0;
+        if (e.key === "ArrowDown" && !atEnd) return;
+        if (e.key === "ArrowUp" && !atStart) return;
+      }
+      move(e.key === "ArrowDown" ? 1 : -1);
+    }
+  }
+
   // 拠点フィルタを切り替えたら追加行の拠点も追従（連続入力しやすく）
   useEffect(() => {
     const b = bases.find((x) => x.name === fBase);
@@ -624,10 +667,11 @@ export default function StakeholderTable({
         <button onClick={exportCsv}>CSVエクスポート</button>
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-      <table style={{ minWidth: 1900 }}>
+      <div style={{ overflowX: "auto", maxHeight: "70vh", overflowY: "auto", border: "1px solid var(--line)" }}>
+      <table className="sheet" style={{ minWidth: 1940 }} onKeyDownCapture={onSheetKeyDown}>
         <thead>
           <tr>
+            <th className="rownum" />
             <th style={{ minWidth: 64 }}>拠点</th>
             <th style={{ minWidth: 96 }}>カテゴリ</th>
             <th style={{ minWidth: 150 }}>所属</th>
@@ -647,7 +691,8 @@ export default function StakeholderTable({
         </thead>
         <tbody>
           {/* ===== スプレッドシート式 追加行 ===== */}
-          <tr style={{ background: "var(--hover)" }}>
+          <tr style={{ background: "var(--hover)" }} data-draft="1">
+            <td className="rownum">＋</td>
             <td>
               <select
                 className="inline-input"
@@ -778,8 +823,9 @@ export default function StakeholderTable({
             </td>
           </tr>
 
-          {rows.map((s) => (
+          {rows.map((s, rowIdx) => (
             <tr className="row" key={s.id}>
+              <td className="rownum">{rowIdx + 1}</td>
               <td>
                 <select
                   className="inline-input"
