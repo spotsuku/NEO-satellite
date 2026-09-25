@@ -346,22 +346,18 @@ export default function StakeholderTable({
     await updateStakeholder({ id: s.id, nextAction, actorName: recorderName });
   }
   async function onActionLog(s: Stakeholder, actionLog: string) {
-    if (actionLog === s.actionLog) return;
     patch(s.id, { actionLog });
     await updateStakeholder({ id: s.id, actionLog, actorName: recorderName });
   }
   async function onMinutes(s: Stakeholder, minutes: string) {
-    if (minutes === s.minutes) return;
     patch(s.id, { minutes });
     await updateStakeholder({ id: s.id, minutes, actorName: recorderName });
   }
   async function onMemo(s: Stakeholder, memo: string) {
-    if (memo === s.memo) return;
     patch(s.id, { memo });
     await updateStakeholder({ id: s.id, memo, actorName: recorderName });
   }
   async function onPassReason(s: Stakeholder, passReason: string) {
-    if (passReason === s.passReason) return;
     patch(s.id, { passReason });
     await updateStakeholder({ id: s.id, passReason, actorName: recorderName });
   }
