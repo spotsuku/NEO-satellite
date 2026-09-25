@@ -178,13 +178,24 @@ textarea.inline-input { resize: none; overflow: hidden; line-height: 1.6; min-he
 
 /* ===== スプレッドシート風グリッド（顧客リスト）=====
    全セルに罫線・行番号・ボーダーレス入力＋選択セルの青枠。Enter=下へ、↑↓=行移動 */
-.sheet { border-collapse: collapse; }
-.sheet th { position: sticky; top: 0; z-index: 6; background: #F3F3F0; border: 1px solid #D7D7D2;
+.sheet { border-collapse: separate; border-spacing: 0; }
+.sheet th { position: sticky; top: 0; z-index: 6; background: #F3F3F0;
+  border-right: 1px solid #D7D7D2; border-bottom: 1px solid #D7D7D2;
   color: #555; font-size: 10px; letter-spacing: .08em; font-weight: 700; padding: 7px 8px; text-align: left; }
-.sheet td { border: 1px solid #E4E4DF; padding: 2px 4px; vertical-align: top; background: var(--paper); }
+.sheet td { border-right: 1px solid #E4E4DF; border-bottom: 1px solid #E4E4DF; padding: 2px 4px; vertical-align: top; background: var(--paper); }
 .sheet tr[data-draft] td { background: var(--hover); }
-.sheet .rownum { width: 34px; min-width: 34px; text-align: center; color: #9A9A94; background: #F3F3F0;
-  border: 1px solid #D7D7D2; font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 7px 2px; vertical-align: middle; }
+.sheet .rownum { width: 34px; min-width: 34px; text-align: center; color: #9A9A94; background: #F3F3F0 !important;
+  border-right: 1px solid #D7D7D2; font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 7px 2px; vertical-align: middle; }
+/* 列固定（スプレッドシートの「固定」）: 行番号〜所属を横スクロール時も左に固定 */
+.sheet.freeze th:nth-child(2), .sheet.freeze td:nth-child(2) { min-width: 76px; max-width: 76px; }
+.sheet.freeze th:nth-child(3), .sheet.freeze td:nth-child(3) { min-width: 112px; max-width: 112px; }
+.sheet.freeze td:nth-child(-n+4) { position: sticky; z-index: 4; }
+.sheet.freeze th:nth-child(-n+4) { z-index: 9; }
+.sheet.freeze th:nth-child(1), .sheet.freeze td:nth-child(1) { left: 0; position: sticky; }
+.sheet.freeze th:nth-child(2), .sheet.freeze td:nth-child(2) { left: 34px; }
+.sheet.freeze th:nth-child(3), .sheet.freeze td:nth-child(3) { left: 111px; }
+.sheet.freeze th:nth-child(4), .sheet.freeze td:nth-child(4) { left: 224px; }
+.sheet.freeze th:nth-child(4), .sheet.freeze td:nth-child(4) { border-right: 2px solid #C2C2BC; }
 .sheet .inline-input { border: none; background: transparent; padding: 5px 5px; }
 .sheet .inline-input:focus { outline: 2px solid var(--cyan); outline-offset: -2px; border: none; }
 .sheet select.inline-input { cursor: pointer; }

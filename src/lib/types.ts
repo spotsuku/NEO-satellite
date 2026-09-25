@@ -8,7 +8,6 @@
 export type StatusName =
   | "未アプローチ"
   | "アポ調整中"
-  | "商談中"
   | "検討中"
   | "内諾"
   | "確定"
@@ -92,6 +91,7 @@ export interface Stakeholder {
   actionLog: string; // アクションログ（実施済みの記録・複数行）
   memo: string; // 備考メモ（自由記述・複数行）
   reviewChecks: string[]; // 検討状況チェック（REVIEW_ITEMS のうちクリアした項目名）
+  passReason: string; // 見送り理由（見送り時の記録・複数行）
   isSample: boolean;
   isStale: boolean;
 }

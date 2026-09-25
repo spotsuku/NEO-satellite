@@ -1,7 +1,7 @@
 // =============================================================================
 // モックデータ（Supabase 未設定時のフォールバック）
 // design モックの DATA を正規化した RawBundle。
-// Excel 受け入れ相当データ（大分: ジェイリース＝オーナー候補/商談中/1000万、APU＝教育機関）を含む。
+// Excel 受け入れ相当データ（大分: ジェイリース＝オーナー候補/検討中/1000万、APU＝教育機関）を含む。
 // =============================================================================
 
 import type { RawBundle } from "./assembler";
@@ -27,7 +27,6 @@ export const MOCK_BUNDLE: RawBundle = {
   statuses: [
     { name: "未アプローチ", confidence: 0, is_active_deal: false, is_terminal: false, color: "#707070" },
     { name: "アポ調整中", confidence: 0, is_active_deal: true, is_terminal: false, color: "#00C0F0" },
-    { name: "商談中", confidence: 0.3, is_active_deal: true, is_terminal: false, color: "#00C0F0" },
     { name: "検討中", confidence: 0.5, is_active_deal: true, is_terminal: false, color: "#F0F000" },
     { name: "内諾", confidence: 0.8, is_active_deal: true, is_terminal: false, color: "#F03090" },
     { name: "確定", confidence: 1.0, is_active_deal: false, is_terminal: true, color: "#50F000" },
@@ -50,8 +49,8 @@ export const MOCK_BUNDLE: RawBundle = {
     { name: "連携", color: "#0A0A0A" },
   ],
   stakeholders: [
-    { id: "sk1", base_code: "oita", category: "オーナー候補", status: "商談中", name: "ジェイリース", contact_name: "—", commit_amount: 1000, approached_on: "2026-06-24", last_touched_on: "2026-06-24", next_action: "役員向け収支シミュレーション提示（7/10）\n決裁権者の同席を依頼", next_action_due: "2026-07-10", minutes: "https://docs.google.com/document/d/example-0624\nhttps://docs.google.com/document/d/example-0701", action_log: "6/24 初回訪問。構想に強い関心\n7/1 2回目MTG。収支の質問多数", memo: "決裁は役員会（毎月第2火曜）", review_checks: ["共感度","ニーズ","金額"], is_sample: false },
-    { id: "sk2", base_code: "oita", category: "教育機関", status: "商談中", name: "APU（立命館アジア太平洋大学）", contact_name: "地域連携室", commit_amount: null, approached_on: "2026-06-18", last_touched_on: "2026-06-18", next_action: "連携形式の選択肢を提示", next_action_due: null, is_sample: false },
+    { id: "sk1", base_code: "oita", category: "オーナー候補", status: "検討中", name: "ジェイリース", contact_name: "—", commit_amount: 1000, approached_on: "2026-06-24", last_touched_on: "2026-06-24", next_action: "役員向け収支シミュレーション提示（7/10）\n決裁権者の同席を依頼", next_action_due: "2026-07-10", minutes: "https://docs.google.com/document/d/example-0624\nhttps://docs.google.com/document/d/example-0701", action_log: "6/24 初回訪問。構想に強い関心\n7/1 2回目MTG。収支の質問多数", memo: "決裁は役員会（毎月第2火曜）", review_checks: ["共感度","ニーズ","金額"], is_sample: false },
+    { id: "sk2", base_code: "oita", category: "教育機関", status: "検討中", name: "APU（立命館アジア太平洋大学）", contact_name: "地域連携室", commit_amount: null, approached_on: "2026-06-18", last_touched_on: "2026-06-18", next_action: "連携形式の選択肢を提示", next_action_due: null, is_sample: false },
     { id: "sk3", base_code: "oita", category: "オーナー候補", status: "アポ調整中", name: "県内メーカーA社", contact_name: "経営企画", commit_amount: null, approached_on: "2026-06-26", last_touched_on: "2026-06-26", next_action: "初回訪問の日程調整", next_action_due: null, is_sample: true },
     { id: "sk4", base_code: "oita", category: "自治体・メディア", status: "未アプローチ", name: "大分市 商工労政課", contact_name: "—", commit_amount: null, approached_on: null, last_touched_on: null, next_action: "", next_action_due: null, is_sample: true },
     { id: "sk5", base_code: "oita", category: "学生事務局", status: "検討中", name: "学生リーダー候補 K氏", contact_name: "APU 3年", commit_amount: null, approached_on: "2026-06-21", last_touched_on: "2026-06-21", next_action: "戦略会議の議事メモ共有・役割相談", next_action_due: null, is_sample: true },
@@ -113,7 +112,7 @@ export const MOCK_BUNDLE: RawBundle = {
   ],
   activities: [
     { id: "a1", base_name: "長崎", kind: "system", title: "デスクリサーチ完了", body: "ターゲットリスト初期充足。T1探索フェーズへ。", is_big: false, actor_name: "事務局", created_at: "2026-06-28" },
-    { id: "a2", base_name: "大分", kind: "status", title: "ジェイリース：商談中に前進", body: "コミット希望額1,000万円で協議開始。", is_big: false, actor_name: "事務局", created_at: "2026-06-26" },
+    { id: "a2", base_name: "大分", kind: "status", title: "ジェイリース：検討中に前進", body: "コミット希望額1,000万円で協議開始。", is_big: false, actor_name: "事務局", created_at: "2026-06-26" },
     { id: "a3", base_name: "熊本", kind: "trigger", title: "T1 地域の紹介役合意 成立", body: "紹介協力の合意獲得。3ヶ月時計スタート、戦略会議に向け興味人材の収集開始。", is_big: true, actor_name: "事務局", created_at: "2026-06-25" },
     { id: "a4", base_name: "大分", kind: "status", title: "学生リーダー候補と面談", body: "APU 3年 K氏。学生事務局の構想に強い関心。", is_big: false, actor_name: "事務局", created_at: "2026-06-21" },
     { id: "a5", base_name: "大分", kind: "trigger", title: "T2 現地立上げ戦略会議 成立", body: "参加9名・宿題持ち帰り3名。「俺たちのプロジェクト」の空気に。", is_big: true, actor_name: "事務局", created_at: "2026-06-20" },

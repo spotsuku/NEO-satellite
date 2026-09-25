@@ -110,6 +110,7 @@ export interface UpdateStakeholderInput {
   actionLog?: string; // アクションログ
   memo?: string; // 備考メモ
   reviewChecks?: string[]; // 検討状況チェック（項目名の配列）
+  passReason?: string; // 見送り理由
   actorName: string;
 }
 
@@ -140,6 +141,7 @@ export async function updateStakeholder(input: UpdateStakeholderInput): Promise<
   if (input.actionLog !== undefined) patch.action_log = input.actionLog || null;
   if (input.memo !== undefined) patch.memo = input.memo || null;
   if (input.reviewChecks !== undefined) patch.review_checks = input.reviewChecks;
+  if (input.passReason !== undefined) patch.pass_reason = input.passReason || null;
   if (input.category !== undefined) {
     const { data: cat } = await db.from("categories").select("id").eq("name", input.category).single();
     if (!cat) return { ok: false, error: "カテゴリが見つかりません" };

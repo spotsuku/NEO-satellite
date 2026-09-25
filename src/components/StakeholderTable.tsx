@@ -141,6 +141,7 @@ function AddModal({
       actionLog: "",
       memo: "",
       reviewChecks: [],
+      passReason: "",
       isSample: false,
       isStale: false,
     });
@@ -244,6 +245,17 @@ export default function StakeholderTable({
   const [added, setAdded] = useState<Stakeholder[]>([]);
   const [deleted, setDeleted] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  // 列固定（行番号〜所属を横スクロール時も表示）: スプレッドシートの「固定」相当
+  const [freeze, setFreeze] = useState(true);
+  useEffect(() => {
+    setFreeze(window.localStorage.getItem("neo_sheet_freeze") !== "0");
+  }, []);
+  function toggleFreeze() {
+    setFreeze((v) => {
+      window.localStorage.setItem("neo_sheet_freeze", v ? "0" : "1");
+      return !v;
+    });
+  }
   const [pasteMsg, setPasteMsg] = useState<string | null>(null);
 
   // スプレッドシート式の追加行（拠点/カテゴリ/ステータスは連続入力向けに保持）
@@ -347,6 +359,11 @@ export default function StakeholderTable({
     if (memo === s.memo) return;
     patch(s.id, { memo });
     await updateStakeholder({ id: s.id, memo, actorName: recorderName });
+  }
+  async function onPassReason(s: Stakeholder, passReason: string) {
+    if (passReason === s.passReason) return;
+    patch(s.id, { passReason });
+    await updateStakeholder({ id: s.id, passReason, actorName: recorderName });
   }
   async function onReviewToggle(s: Stakeholder, item: string) {
     const cur = s.reviewChecks ?? [];
@@ -475,6 +492,7 @@ export default function StakeholderTable({
       actionLog: "",
       memo: "",
       reviewChecks: [],
+      passReason: "",
       isSample: false,
       isStale: false,
     };
@@ -579,7 +597,7 @@ export default function StakeholderTable({
   // 表示中の行をスプレッドシート形式（TSV）でコピー（複数行セルは「 / 」に畳む）
   async function copyTsv() {
     const flat = (v: string) => v.replace(/\r?\n/g, " / ");
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL", "見送り理由"];
     const lines = rows.map((s) =>
       [
         s.baseName,
@@ -596,6 +614,7 @@ export default function StakeholderTable({
         flat(s.minutes),
         flat(s.memo),
         s.url,
+        flat(s.passReason),
       ].join("\t"),
     );
     await navigator.clipboard.writeText([head.join("\t"), ...lines].join("\n"));
@@ -604,7 +623,7 @@ export default function StakeholderTable({
   }
 
   function exportCsv() {
-    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL"];
+    const head = ["拠点", "カテゴリ", "所属", "氏名", "役職", "ステータス", "検討状況", "金額(万)", "アプローチ日", "次回アクション", "アクションログ", "議事録URL", "備考メモ", "URL", "見送り理由"];
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const lines = rows.map((s) =>
       [
@@ -622,6 +641,7 @@ export default function StakeholderTable({
         s.minutes,
         s.memo,
         s.url,
+        s.passReason,
       ]
         .map((v) => esc(String(v)))
         .join(","),
@@ -662,13 +682,16 @@ export default function StakeholderTable({
         <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--gray)", alignSelf: "center" }}>
           {pasteMsg ?? "下の追加行に入力 ／ Excel・スプレッドシートから貼り付けで一括登録"}
         </span>
+        <button onClick={toggleFreeze} title="所属までの列を横スクロール時も固定表示">
+          {freeze ? "📌 列固定中（所属まで）" : "📌 列を固定"}
+        </button>
         <button onClick={copyTsv}>{copied ? "✓ コピーしました" : "表をコピー"}</button>
         <button onClick={() => setShowAdd(true)}>フォームで追加</button>
         <button onClick={exportCsv}>CSVエクスポート</button>
       </div>
 
       <div style={{ overflowX: "auto", maxHeight: "70vh", overflowY: "auto", border: "1px solid var(--line)" }}>
-      <table className="sheet" style={{ minWidth: 1940 }} onKeyDownCapture={onSheetKeyDown}>
+      <table className={`sheet${freeze ? " freeze" : ""}`} style={{ minWidth: 2100 }} onKeyDownCapture={onSheetKeyDown}>
         <thead>
           <tr>
             <th className="rownum" />
@@ -678,7 +701,12 @@ export default function StakeholderTable({
             <th style={{ minWidth: 84 }}>氏名</th>
             <th style={{ minWidth: 76 }}>役職</th>
             <th style={{ minWidth: 100 }}>ステータス</th>
-            <th style={{ minWidth: 190 }}>検討状況</th>
+            <th style={{ minWidth: 190 }}>
+              検討状況
+              <span style={{ display: "block", fontWeight: 400, letterSpacing: 0, color: "#8A8A84", marginTop: 2 }}>
+                クリアしている項目をクリックして✓
+              </span>
+            </th>
             <th style={{ textAlign: "right", minWidth: 70 }}>金額(万)</th>
             <th style={{ minWidth: 106 }}>アプローチ日</th>
             <th style={{ minWidth: 170 }}>次回アクション</th>
@@ -686,6 +714,7 @@ export default function StakeholderTable({
             <th style={{ minWidth: 160 }}>議事録</th>
             <th style={{ minWidth: 160 }}>備考メモ</th>
             <th style={{ width: 130 }}>URL</th>
+            <th style={{ minWidth: 150 }}>見送り理由</th>
             <th style={{ width: 40 }} />
           </tr>
         </thead>
@@ -802,6 +831,7 @@ export default function StakeholderTable({
                 onKeyDown={onDraftEnter}
               />
             </td>
+            <td className="dim">—</td>
             <td>
               <button
                 onClick={commitDraft}
@@ -1019,6 +1049,14 @@ export default function StakeholderTable({
                 </div>
               </td>
               <td>
+                <GrowArea
+                  value={s.passReason}
+                  placeholder={s.status === "見送り" ? "見送り理由を記録" : "（見送り時に記入）"}
+                  onChange={(e) => patch(s.id, { passReason: e.target.value })}
+                  onBlur={(e) => onPassReason(s, e.target.value)}
+                />
+              </td>
+              <td>
                 <button
                   onClick={() => onDelete(s)}
                   title="このステークホルダーを削除"
@@ -1049,7 +1087,7 @@ export default function StakeholderTable({
       </table>
       </div>
       <div className="footnote">
-        「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。
+        検討状況は商談でクリアできている項目をクリックしてチェックします（もう一度クリックで解除・全員に共有）。「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。
         次回アクション・アクションログは改行して複数記載できます。議事録はMTGのたびにURLを1行ずつ追記すると 📄1 📄2 … のリンクになります。
       </div>
 

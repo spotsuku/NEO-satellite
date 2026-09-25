@@ -61,8 +61,8 @@ alter table triggers add column if not exists checklist jsonb; -- 成立条件�
 create table if not exists statuses (
   id uuid primary key default gen_random_uuid(),
   name text unique not null,                   -- '未アプローチ'〜'見送り'
-  confidence numeric not null default 0,       -- 金額確度: 商談中0.3, 検討中0.5, 内諾0.8, 確定1.0
-  is_active_deal boolean not null default false, -- 停滞アラート対象（アポ調整中/商談中/検討中/内諾）
+  confidence numeric not null default 0,       -- 金額確度: 検討中0.5, 内諾0.8, 確定1.0
+  is_active_deal boolean not null default false, -- 停滞アラート対象（アポ調整中/検討中/内諾）
   is_terminal boolean not null default false,  -- 確定/見送り
   color text not null,                         -- 表示色 HEX
   sort integer not null
@@ -122,6 +122,7 @@ create index if not exists idx_stakeholders_status on stakeholders(status_id);
 alter table stakeholders add column if not exists minutes text;    -- 議事録URL（1行に1URL・MTGごとに追記）
 alter table stakeholders add column if not exists action_log text; -- アクションログ（実施済みの記録・複数行）
 alter table stakeholders add column if not exists review_checks jsonb; -- 検討状況チェック（クリアした項目名の配列）
+alter table stakeholders add column if not exists pass_reason text;     -- 見送り理由
 
 create table if not exists trigger_events (
   id uuid primary key default gen_random_uuid(),

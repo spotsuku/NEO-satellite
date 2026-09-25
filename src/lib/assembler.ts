@@ -89,6 +89,7 @@ export interface RawStakeholder {
   action_log?: string | null; // アクションログ（実施済みの記録）
   memo?: string | null; // 備考メモ
   review_checks?: string[] | null; // 検討状況チェック（項目名の配列）
+  pass_reason?: string | null; // 見送り理由
   is_sample: boolean;
 }
 export interface RawTriggerEvent {
@@ -235,6 +236,7 @@ export function buildDashboard(
       actionLog: s.action_log ?? "",
       memo: s.memo ?? "",
       reviewChecks: Array.isArray(s.review_checks) ? s.review_checks : [],
+      passReason: s.pass_reason ?? "",
       isSample: s.is_sample,
       isStale: isStale(
         {

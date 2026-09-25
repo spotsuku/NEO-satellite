@@ -57,15 +57,14 @@ update triggers set checklist = c.list from (values
 ) as c(code, list) where triggers.code = c.code;
 
 -- ---------- ステータス（7値）----------
--- confidence: 商談中0.3・検討中0.5・内諾0.8・確定1.0（app_settings ではなくここが正）
+-- confidence: 検討中0.5・内諾0.8・確定1.0（app_settings ではなくここが正）
 insert into statuses (name, confidence, is_active_deal, is_terminal, color, sort) values
   ('未アプローチ', 0,   false, false, '#707070', 1),
   ('アポ調整中',   0,   true,  false, '#00C0F0', 2),
-  ('商談中',       0.3, true,  false, '#00C0F0', 3),
-  ('検討中',       0.5, true,  false, '#F0F000', 4),
-  ('内諾',         0.8, true,  false, '#F03090', 5),
-  ('確定',         1.0, false, true,  '#50F000', 6),
-  ('見送り',       0,   false, true,  '#F01010', 7)
+  ('検討中',       0.5, true,  false, '#F0F000', 3),
+  ('内諾',         0.8, true,  false, '#F03090', 4),
+  ('確定',         1.0, false, true,  '#50F000', 5),
+  ('見送り',       0,   false, true,  '#F01010', 6)
 on conflict (name) do update
   set confidence = excluded.confidence, is_active_deal = excluded.is_active_deal,
       is_terminal = excluded.is_terminal, color = excluded.color, sort = excluded.sort;

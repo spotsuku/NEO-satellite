@@ -7,7 +7,7 @@ import type { DashboardData, BaseView, Stakeholder, StatusDef } from "@/lib/type
 import { YEN, REVIEW_ITEMS, pct } from "@/lib/domain";
 import MoneyBar from "./MoneyBar";
 
-const IN_TALKS = ["商談中", "検討中", "内諾", "確定"]; // 商談化とみなすステータス
+const IN_TALKS = ["検討中", "内諾", "確定"]; // 商談化（検討中以上）とみなすステータス
 const SOFT = ["内諾", "確定"];
 
 interface BaseSales {
@@ -214,7 +214,7 @@ export default function SalesView({ data }: { data: DashboardData }) {
         </tbody>
       </table>
       <div className="footnote">
-        商談化率＝商談中・検討中・内諾・確定の合計／リスト数。見込み受注（加重）＝各社の金額×ステータス確度（検討中0.5・内諾0.8・確定1.0 等）の合計。
+        商談化率＝検討中・内諾・確定の合計／リスト数。見込み受注（加重）＝各社の金額×ステータス確度（検討中0.5・内諾0.8・確定1.0 等）の合計。
         金額はオーナー候補（金額入力あり）が対象です。数値はすべて顧客リストの入力からリアルタイムに集計されます。
       </div>
     </>
