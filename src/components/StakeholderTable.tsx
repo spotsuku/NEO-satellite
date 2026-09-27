@@ -238,6 +238,7 @@ export default function StakeholderTable({
 }) {
   const [fBase, setFBase] = useState(ALL);
   const [fCat, setFCat] = useState(ALL);
+  const [fStatus, setFStatus] = useState(ALL);
   const [query, setQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   // 楽観的更新の上書き（id → 差分）と追加行（Supabase モードでは refresh 後に本データへ）
@@ -326,6 +327,7 @@ export default function StakeholderTable({
       !deleted.has(s.id) &&
       (fBase === ALL || s.baseName === fBase) &&
       (fCat === ALL || s.category === fCat) &&
+      (fStatus === ALL || s.status === fStatus) &&
       (query === "" ||
         s.name.toLowerCase().includes(query.toLowerCase()) ||
         s.contactName.toLowerCase().includes(query.toLowerCase())),
@@ -664,6 +666,32 @@ export default function StakeholderTable({
         {catNames.map((n) => (
           <button key={n} className={n === fCat ? "on" : ""} onClick={() => setFCat(n)}>
             {n}
+          </button>
+        ))}
+      </div>
+      {/* ステータスで絞り込み */}
+      <div className="filters">
+        <button className={fStatus === ALL ? "on" : ""} onClick={() => setFStatus(ALL)}>
+          すべて
+        </button>
+        {statuses.map((st) => (
+          <button
+            key={st.name}
+            className={st.name === fStatus ? "on" : ""}
+            onClick={() => setFStatus(st.name)}
+          >
+            <i
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: st.color,
+                marginRight: 6,
+                verticalAlign: 0,
+              }}
+            />
+            {st.name}
           </button>
         ))}
       </div>
