@@ -102,7 +102,7 @@ function AddModal({
       return;
     }
     setBusy(true);
-    const commitAmount = usesAmount && amount !== "" ? Number(amount) : null;
+    const commitAmount = amount !== "" ? Number(amount) : null;
     const res = await createStakeholder({
       baseCode,
       category,
@@ -197,12 +197,10 @@ function AddModal({
                 ))}
               </select>
             </div>
-            {usesAmount && (
-              <div>
-                <label>期待金額（万円）</label>
-                <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-            )}
+            <div>
+              <label>見込み金額（万円）</label>
+              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
           </div>
           <label>次回アクション</label>
           <input type="text" value={nextAction} onChange={(e) => setNextAction(e.target.value)} />
@@ -819,19 +817,15 @@ export default function StakeholderTable({
             </td>
             <td className="dim">—</td>
             <td className="amtcell">
-              {(categories.find((c) => c.name === draft.category)?.usesAmount ?? false) ? (
-                <input
-                  className="inline-input"
-                  style={{ textAlign: "right", maxWidth: 90 }}
-                  type="number"
-                  placeholder="万円"
-                  value={draft.amount}
-                  onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
-                  onKeyDown={onDraftEnter}
-                />
-              ) : (
-                <span className="dim">—</span>
-              )}
+              <input
+                className="inline-input"
+                style={{ textAlign: "right", maxWidth: 90 }}
+                type="number"
+                placeholder="万円"
+                value={draft.amount}
+                onChange={(e) => setDraft((d) => ({ ...d, amount: e.target.value }))}
+                onKeyDown={onDraftEnter}
+              />
             </td>
             <td className="dim">今日</td>
             <td>
@@ -988,18 +982,15 @@ export default function StakeholderTable({
                 </div>
               </td>
               <td className="amtcell" style={{ color: s.commitAmount ? "var(--ink)" : "var(--gray)" }}>
-                {s.usesAmount ? (
-                  <input
-                    className="inline-input"
-                    style={{ textAlign: "right", maxWidth: 90 }}
-                    type="number"
-                    value={s.commitAmount ?? ""}
-                    placeholder="—"
-                    onChange={(e) => onAmount(s, e.target.value)}
-                  />
-                ) : (
-                  "—"
-                )}
+                <input
+                  className="inline-input"
+                  style={{ textAlign: "right", maxWidth: 90 }}
+                  type="number"
+                  value={s.commitAmount ?? ""}
+                  placeholder="—"
+                  title={s.usesAmount ? "加盟金ゲージ・T8の集計対象（オーナー候補）" : "見込み金額（参考値・加盟金ゲージには含まれません）"}
+                  onChange={(e) => onAmount(s, e.target.value)}
+                />
               </td>
               <td className="dim">
                 <input
@@ -1111,7 +1102,7 @@ export default function StakeholderTable({
       </table>
       </div>
       <div className="footnote">
-        検討状況は商談でクリアできている項目をクリックしてチェックします（もう一度クリックで解除・全員に共有）。「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はオーナー候補のコミット希望額です。
+        検討状況は商談でクリアできている項目をクリックしてチェックします（もう一度クリックで解除・全員に共有）。「次回アクション」が未設定、またはアプローチ日から14日以上動きがない先は赤で警告表示します。金額列はどのカテゴリでも見込み金額を記入できます（加盟金ゲージ・T8達成の集計対象になるのはオーナー候補の金額のみ）。
         次回アクション・アクションログは改行して複数記載できます。議事録はMTGのたびにURLを1行ずつ追記すると 📄1 📄2 … のリンクになります。
       </div>
 
