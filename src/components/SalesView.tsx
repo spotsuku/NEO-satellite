@@ -1,7 +1,8 @@
 "use client";
 
 // 営業進捗ビュー: 各拠点の商談ステータス分布・ファネル率・見込み/確定金額を1画面で俯瞰する。
-// 金額はオーナー候補（金額あり）の確定/内諾込み/加重見込み（確度係数）を使用。
+// 金額は全カテゴリの合計（会員企業などの見込み金額を含む）。加盟金（オーナー候補のみ）は
+// T8・目標比の判定対象として併記する。
 
 import type { DashboardData, BaseView, Stakeholder, StatusDef } from "@/lib/types";
 import { YEN, REVIEW_ITEMS, pct } from "@/lib/domain";
@@ -94,15 +95,16 @@ export default function SalesView({ data }: { data: DashboardData }) {
   const sales = data.bases.map((b) => calc(b, data.stakeholders, data.statuses));
   const sum = (f: (s: BaseSales) => number) => sales.reduce((a, s) => a + f(s), 0);
   const goalTotal = data.bases.reduce((a, b) => a + b.goalAmount, 0);
-  const fixed = data.bases.reduce((a, b) => a + b.money.fixed, 0);
-  const withSoft = data.bases.reduce((a, b) => a + b.money.withSoft, 0);
-  const weighted = data.bases.reduce((a, b) => a + b.money.weighted, 0);
+  const fixed = data.bases.reduce((a, b) => a + b.money.fixed, 0); // 加盟金（オーナーのみ）
+  const fixedAll = data.bases.reduce((a, b) => a + b.moneyAll.fixed, 0);
+  const withSoftAll = data.bases.reduce((a, b) => a + b.moneyAll.withSoft, 0);
+  const weightedAll = data.bases.reduce((a, b) => a + b.moneyAll.weighted, 0);
 
   const tiles: [string, string, string][] = [
-    ["確定金額（全社）", `${YEN(fixed)}万`, "var(--green)"],
-    ["内諾込み", `${YEN(withSoft)}万`, "var(--pink)"],
-    ["見込み受注（加重）", `${YEN(weighted)}万`, "var(--cyan)"],
-    ["目標達成率", goalTotal > 0 ? `${Math.round((fixed / goalTotal) * 100)}%` : "—", "var(--yellow)"],
+    ["確定金額（全社合計）", `${YEN(fixedAll)}万`, "var(--green)"],
+    ["内諾込み（合計）", `${YEN(withSoftAll)}万`, "var(--pink)"],
+    ["見込み受注（加重・合計）", `${YEN(weightedAll)}万`, "var(--cyan)"],
+    ["加盟金 目標達成率", goalTotal > 0 ? `${Math.round((fixed / goalTotal) * 100)}%` : "—", "var(--yellow)"],
   ];
 
   return (
@@ -127,7 +129,8 @@ export default function SalesView({ data }: { data: DashboardData }) {
                 <b>{b.name}</b>
                 <small>{b.nameEn}</small>
                 <span style={{ marginLeft: "auto", fontSize: 11 }}>
-                  確定 <b style={{ color: "var(--green)" }}>{YEN(b.money.fixed)}</b> / {YEN(b.goalAmount)}万
+                  合計確定 <b style={{ color: "var(--green)" }}>{YEN(b.moneyAll.fixed)}万</b>
+                  <small style={{ color: "var(--gray)" }}>（加盟金 {YEN(b.money.fixed)} / {YEN(b.goalAmount)}万）</small>
                 </span>
               </div>
 
@@ -148,7 +151,14 @@ export default function SalesView({ data }: { data: DashboardData }) {
               <div className="slabel">ファネル</div>
               <Funnel s={s} />
 
-              <div className="slabel">加盟金（確定 / 内諾込み / 加重見込み）</div>
+              <div className="slabel">金額合計（全カテゴリ・会員企業の見込みを含む）</div>
+              <div style={{ display: "flex", gap: 14, fontSize: 11, marginTop: 2, fontWeight: 700 }}>
+                <span><i className="sw" style={{ background: "var(--green)" }} />確定 {YEN(b.moneyAll.fixed)}万</span>
+                <span><i className="sw" style={{ background: "var(--pink)" }} />内諾込み {YEN(b.moneyAll.withSoft)}万</span>
+                <span><i className="sw" style={{ background: "var(--cyan)" }} />加重 {YEN(b.moneyAll.weighted)}万</span>
+              </div>
+
+              <div className="slabel">加盟金（オーナー候補のみ・T8/目標比の対象）</div>
               <MoneyBar money={b.money} goal={b.goalAmount} />
               <div style={{ display: "flex", gap: 14, fontSize: 11, marginTop: 4 }}>
                 <span><i className="sw" style={{ background: "var(--green)" }} />確定 {YEN(b.money.fixed)}万</span>
@@ -178,10 +188,11 @@ export default function SalesView({ data }: { data: DashboardData }) {
             <th style={{ textAlign: "right" }}>商談化率</th>
             <th style={{ textAlign: "right" }}>内諾率</th>
             <th style={{ textAlign: "right" }}>確定率</th>
-            <th style={{ textAlign: "right" }}>確定金額</th>
-            <th style={{ textAlign: "right" }}>内諾込み</th>
-            <th style={{ textAlign: "right" }}>見込み（加重）</th>
-            <th style={{ textAlign: "right" }}>目標比</th>
+            <th style={{ textAlign: "right" }}>確定金額（合計）</th>
+            <th style={{ textAlign: "right" }}>内諾込み（合計）</th>
+            <th style={{ textAlign: "right" }}>見込み（加重・合計）</th>
+            <th style={{ textAlign: "right" }}>加盟金確定</th>
+            <th style={{ textAlign: "right" }}>加盟金 目標比</th>
           </tr>
         </thead>
         <tbody>
@@ -193,9 +204,10 @@ export default function SalesView({ data }: { data: DashboardData }) {
               <td style={{ textAlign: "right" }}>{rate(s.inTalks, s.total)}</td>
               <td style={{ textAlign: "right" }}>{rate(s.soft, s.total)}</td>
               <td style={{ textAlign: "right" }}>{rate(s.won, s.total)}</td>
-              <td style={{ textAlign: "right", color: "var(--green)", fontWeight: 700 }}>{YEN(s.base.money.fixed)}万</td>
-              <td style={{ textAlign: "right" }}>{YEN(s.base.money.withSoft)}万</td>
-              <td style={{ textAlign: "right" }}>{YEN(s.base.money.weighted)}万</td>
+              <td style={{ textAlign: "right", color: "var(--green)", fontWeight: 700 }}>{YEN(s.base.moneyAll.fixed)}万</td>
+              <td style={{ textAlign: "right" }}>{YEN(s.base.moneyAll.withSoft)}万</td>
+              <td style={{ textAlign: "right" }}>{YEN(s.base.moneyAll.weighted)}万</td>
+              <td style={{ textAlign: "right" }}>{YEN(s.base.money.fixed)}万</td>
               <td style={{ textAlign: "right" }}>{Math.round(pct(s.base.money.fixed, s.base.goalAmount))}%</td>
             </tr>
           ))}
@@ -206,16 +218,17 @@ export default function SalesView({ data }: { data: DashboardData }) {
             <td style={{ textAlign: "right" }}>{rate(sum((s) => s.inTalks), sum((s) => s.total))}</td>
             <td style={{ textAlign: "right" }}>{rate(sum((s) => s.soft), sum((s) => s.total))}</td>
             <td style={{ textAlign: "right" }}>{rate(sum((s) => s.won), sum((s) => s.total))}</td>
-            <td style={{ textAlign: "right", color: "var(--green)" }}>{YEN(fixed)}万</td>
-            <td style={{ textAlign: "right" }}>{YEN(withSoft)}万</td>
-            <td style={{ textAlign: "right" }}>{YEN(weighted)}万</td>
+            <td style={{ textAlign: "right", color: "var(--green)" }}>{YEN(fixedAll)}万</td>
+            <td style={{ textAlign: "right" }}>{YEN(withSoftAll)}万</td>
+            <td style={{ textAlign: "right" }}>{YEN(weightedAll)}万</td>
+            <td style={{ textAlign: "right" }}>{YEN(fixed)}万</td>
             <td style={{ textAlign: "right" }}>{goalTotal > 0 ? Math.round((fixed / goalTotal) * 100) : 0}%</td>
           </tr>
         </tbody>
       </table>
       <div className="footnote">
         商談化率＝検討中・内諾・確定の合計／リスト数。見込み受注（加重）＝各社の金額×ステータス確度（検討中0.5・内諾0.8・確定1.0 等）の合計。
-        金額はオーナー候補（金額入力あり）が対象です。数値はすべて顧客リストの入力からリアルタイムに集計されます。
+        金額の「合計」は全カテゴリ（会員企業等の見込み金額を含む）、「加盟金」はオーナー候補のみでT8・目標比の判定対象です。数値はすべて顧客リストの入力からリアルタイムに集計されます。
       </div>
     </>
   );

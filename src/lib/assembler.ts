@@ -277,11 +277,18 @@ export function buildDashboard(
         partner_univ: fuelFor("partner_univ"),
       };
 
-      // 加盟金
+      // 加盟金（オーナー候補のみ。T8・目標比の判定対象）
       const money = moneyFromStakeholders(
         stakeholders
           .filter((s) => s.baseCode === b.code)
           .map((s) => ({ commitAmount: s.commitAmount, status: s.status, usesAmount: s.usesAmount })),
+        statuses,
+      );
+      // 全カテゴリ合計（会員企業などに記入した見込み金額も含める）
+      const moneyAll = moneyFromStakeholders(
+        stakeholders
+          .filter((s) => s.baseCode === b.code)
+          .map((s) => ({ commitAmount: s.commitAmount, status: s.status, usesAmount: s.commitAmount != null })),
         statuses,
       );
 
@@ -356,6 +363,7 @@ export function buildDashboard(
         fuels,
         fuelTargets,
         money,
+        moneyAll,
         prep,
         prepSecured,
         prepTotal,

@@ -114,7 +114,8 @@ export interface BaseView {
   clockPct: number; // 経過率 0-100
   fuels: Fuels;
   fuelTargets: Fuels;
-  money: MoneyPipeline;
+  money: MoneyPipeline; // 加盟金（オーナー候補のみ・T8/目標比の対象）
+  moneyAll: MoneyPipeline; // 全カテゴリ合計（会員企業などの見込み金額を含む）
   prep: PrepRole[];
   prepSecured: number;
   prepTotal: number;
